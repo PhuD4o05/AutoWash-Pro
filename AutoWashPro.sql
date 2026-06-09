@@ -1,15 +1,20 @@
-if DB_ID ('AutoWashPro') is null
+use master;
+go
+
+if DB_ID('AutoWashPro') is not null
 begin
-	create database AutoWashPro
+    alter database AutoWashPro
+    set single_user with rollback immediate;
+
+    drop database AutoWashPro;
 end
 go
 
---use master
---drop database AutoWashPro
-
-use AutoWashPro
+create database AutoWashPro;
 go
 
+use AutoWashPro;
+go
 -- ~~~~~					USER DATABASES					~~~~~
 create table UserRoles (
 	RoleID tinyint primary key,
@@ -25,7 +30,7 @@ go
 
 create table Users (
 	UserID int identity primary key,
-	[PasswordHash] nvarchar(255) not null,
+	PasswordHash nvarchar(255) not null,
 	FullName nvarchar(50) not null,
 	Phone varchar(15),
 	Email nvarchar(30),
@@ -79,11 +84,12 @@ create table MembershipRanks (
 	constraint CK_Rank_MinimumPoints
 	check (MinimumPoints >= 0)
 )
+go
 insert into MembershipRanks values
 	(1, 'Member', 0),
 	(2, 'Silver', 500),
-	(3, 'Gold', 1500),
-	(4, 'Platinum', 3000);
+	(3, 'Gold', 2000),
+	(4, 'Platinum', 5000);
 go
  
 create table Customers (
@@ -106,19 +112,20 @@ create table Cars (
 go
 
 create table DaysOfWeek (
-    WorkDays tinyint primary key,
-    [DayName] nvarchar(10) not null unique
+	WorkDays tinyint primary key,
+	[DayName] nvarchar(10) not null unique
 )
 go
 insert into DaysOfWeek (WorkDays, DayName)
 values
-    (1, 'Monday'),
-    (2, 'Tuesday'),
-    (3, 'Wednesday'),
-    (4, 'Thursday'),
-    (5, 'Friday'),
-    (6, 'Saturday'),
-    (7, 'Sunday');
+	(1, 'Monday'),
+	(2, 'Tuesday'),
+	(3, 'Wednesday'),
+	(4, 'Thursday'),
+	(5, 'Friday'),
+	(6, 'Saturday'),
+	(7, 'Sunday');
+go
 
 create table Shifts (
 	ShiftID int identity primary key,
@@ -224,7 +231,7 @@ create table BookingAssignments (
 	BookingID int not null foreign key references Bookings(BookingID),
 	UserID int not null foreign key references Staff(UserID),
 
-	primary key(BookingID, UserID),
+	primary key(BookingID, UserID)
 );
 go
 
@@ -276,3 +283,130 @@ create table PointsTransactions (
 	check (PointsChanged <> 0)
 )
 go
+
+create trigger TR_PointsTransaction_Sync
+on PointsTransactions
+after insert, update, delete
+as
+begin
+	set nocount on;
+
+	-- Remove old values
+	update c
+	set c.Points = c.Points - d.TotalPoints
+	from Customers c
+	join (
+		select UserID, sum(PointsChanged) as TotalPoints
+		from deleted
+		group by UserID
+	) d
+		on c.UserID = d.UserID;
+
+	-- Add new values
+	update c
+	set c.Points = c.Points + i.TotalPoints
+	from Customers c
+	join (
+		select UserID, sum(PointsChanged) as TotalPoints
+		from inserted
+		group by UserID
+	) i
+		on c.UserID = i.UserID;
+
+	-- Update customer ranks
+    update c
+    set RankID = r.RankID
+    from Customers c
+    cross apply (
+        select top 1 RankID
+        from MembershipRanks
+        where MinimumPoints <= c.Points
+        order by MinimumPoints desc
+    ) r;
+end;
+go
+
+
+-- ==================== INSERT DATA ==========================
+insert into Users (PasswordHash, FullName, Phone, Email, RoleID) values
+	('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn', 1),
+	('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn', 2),
+	('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn', 3),
+	('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn', 3),
+	('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com', 4),
+	('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com', 4),
+	('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com', 4);
+
+insert into Staff (UserID, Salary, HireDate) values
+	(2, 12000000, '2024-01-15'),
+	(3, 9000000, '2024-03-01'),
+	(4, 9500000, '2024-05-20');
+
+insert into Customers (UserID, Points, RankID) values
+	(5, 350, 1),
+	(6, 1200, 2),
+	(7, 2500, 3);
+
+insert into Cars (LicensePlate, UserID, Brand, Model, Color) values
+	('51A-12345', 5, 'Toyota', 'Vios', 'White'),
+	('59B-67890', 6, 'Honda', 'City', 'Black'),
+	('60C-88888', 7, 'Mazda', 'CX-5', 'Red'),
+	('51H-55555', 5, 'Hyundai', 'Accent', 'Silver');
+
+insert into Shifts (UserID, WorkDays, StartTime, EndTime) values
+	(2, 1, '08:00', '17:00'),
+	(2, 2, '08:00', '17:00'),
+
+	(3, 1, '08:00', '17:00'),
+	(3, 3, '08:00', '17:00'),
+
+	(4, 2, '08:00', '17:00'),
+	(4, 4, '08:00', '17:00');
+
+insert into Bookings
+(
+	UserID,
+	LicensePlate,
+	ServiceID,
+	PaymentMethod,
+	BookTime,
+	CurrentStatus
+)
+values
+	(5, '51A-12345', 2, 'Cash', '2026-06-10 09:00:00', 2),
+	(6, '59B-67890', 3, 'Online Bank Transfer', '2026-06-10 13:00:00', 5),
+	(7, '60C-88888', 4, 'Cash', '2026-06-11 10:00:00', 1);
+
+insert into BookingAssignments (BookingID, UserID) values
+	(1, 3),
+	(2, 4),
+	(3, 3),
+	(3, 4);
+		
+insert into BookingStatusHistory (BookingID, StatusID) values
+	(1, 1),
+	(1, 2),
+
+	(2, 1),
+	(2, 2),
+	(2, 3),
+	(2, 4),
+	(2, 5),
+
+	(3, 1);
+
+insert into Payments (BookingID, Amount, StatusID) values
+	(1, 120000, 2),
+	(2, 200000, 2),
+	(3, 500000, 1);
+
+insert into PointsTransactions
+(
+	PaymentID,
+	UserID,
+	PointsChanged,
+	[Description]
+)
+values
+	(1, 5, 120, 'Points earned from Basic Wash'),
+	(2, 6, 200, 'Points earned from Premium Wash');
