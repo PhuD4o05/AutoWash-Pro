@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Kết quả thanh toán</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        .message { padding: 20px; border-radius: 8px; display: inline-block; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+<div th:class="${message.contains('thành công') ? 'message success' : 'message error'}">
+    <h2 th:text="${message}"></h2>
+</div>
+<br/>
+<a href="/">Về trang chủ</a>
+</body>
+</html>

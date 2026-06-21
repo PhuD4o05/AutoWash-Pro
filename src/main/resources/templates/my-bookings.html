@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lịch sử đặt lịch</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-4">
+    <h2>Lịch sử đặt lịch</h2>
+    <table class="table table-striped" id="bookingsTable">
+        <thead><tr><th>ID</th><th>Thời gian</th><th>Gói</th><th>Trạng thái</th><th>Tổng tiền</th><th>Thanh toán</th><th>Hủy</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <a href="/dashboard" class="btn btn-secondary">Quay lại</a>
+</div>
+
+<script>
+    const token = localStorage.getItem('accessToken');
+    if (!token) window.location.href = '/login';
+
+    async function fetchWithAuth(url, options={}) {
+        const headers = {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'};
+        const res = await fetch(url, {...options, headers});
+        if (res.status===401) { localStorage.removeItem('accessToken'); window.location.href='/login'; }
+        return res;
+    }
+
+    async function loadBookings() {
+        const res = await fetchWithAuth('/api/bookings/my-bookings');
+        const bookings = await res.json();
+        const tbody = document.querySelector('#bookingsTable tbody');
+        tbody.innerHTML = '';
+        for (let b of bookings) {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerText = b.id;
+            row.insertCell(1).innerText = new Date(b.scheduledTime).toLocaleString();
+            row.insertCell(2).innerText = b.packageId;
+            row.insertCell(3).innerText = b.status;
+            row.insertCell(4).innerText = b.totalPrice?.toLocaleString() + ' VND';
+            // Cột thanh toán
+            const payCell = row.insertCell(5);
+            if (b.status === 'PENDING') {
+                const payBtn = document.createElement('button');
+                payBtn.innerText = 'Thanh toán';
+                payBtn.className = 'btn btn-sm btn-primary';
+                payBtn.onclick = () => payBooking(b.id);
+                payCell.appendChild(payBtn);
+            } else if (b.status === 'CONFIRMED') {
+                payCell.innerText = 'Đã thanh toán';
+            } else {
+                payCell.innerText = '—';
+            }
+            // Cột hủy
+            const cancelCell = row.insertCell(6);
+            if (b.status === 'PENDING') {
+                const cancelBtn = document.createElement('button');
+                cancelBtn.innerText = 'Hủy';
+                cancelBtn.className = 'btn btn-sm btn-danger';
+                cancelBtn.onclick = () => cancelBooking(b.id);
+                cancelCell.appendChild(cancelBtn);
+            } else {
+                cancelCell.innerText = '—';
+            }
+        }
+    }
+
+    async function payBooking(bookingId) {
+        const res = await fetchWithAuth(`/api/payments/${bookingId}`, {
+            method: 'POST',
+            body: JSON.stringify({paymentMethod: 'VIETQR', amount: null})
+        });
+        if (res.ok) {
+            const payment = await res.json();
+            // Mở link thanh toán trong tab mới
+            window.open(payment.transactionId, '_blank');
+            alert('Mở link thanh toán. Sau khi thanh toán, trang sẽ tự cập nhật.');
+            setTimeout(() => location.reload(), 5000);
+        } else {
+            alert('Lỗi tạo thanh toán');
+        }
+    }
+
+    async function cancelBooking(bookingId) {
+        if (!confirm('Bạn có chắc hủy đặt lịch này?')) return;
+        const res = await fetchWithAuth(`/api/bookings/${bookingId}`, {method: 'DELETE'});
+        if (res.ok) {
+            alert('Hủy thành công');
+            loadBookings();
+        } else {
+            alert('Hủy thất bại');
+        }
+    }
+
+    loadBookings();
+</script>
+</body>
+</html>

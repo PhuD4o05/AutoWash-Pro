@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Đặt lịch</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-4" style="max-width: 600px;">
+    <h2>Đặt lịch rửa xe</h2>
+    <form id="bookingForm">
+        <div class="mb-3">
+            <label>Chọn xe</label>
+            <select id="vehicleId" class="form-select" required></select>
+        </div>
+        <div class="mb-3">
+            <label>Chọn gói dịch vụ</label>
+            <select id="packageId" class="form-select" required></select>
+        </div>
+        <div class="mb-3">
+            <label>Thời gian dự kiến</label>
+            <input type="datetime-local" id="scheduledTime" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label>Tổng tiền (VND)</label>
+            <input type="number" id="totalPrice" class="form-control" readonly>
+        </div>
+        <button type="submit" class="btn btn-primary">Đặt lịch</button>
+    </form>
+    <div id="result" class="mt-3"></div>
+    <a href="/dashboard" class="btn btn-secondary mt-2">Quay lại</a>
+</div>
+
+<script>
+    const token = localStorage.getItem('accessToken');
+    if (!token) window.location.href = '/login';
+
+    async function fetchWithAuth(url, options = {}) {
+        const headers = {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'};
+        const res = await fetch(url, {...options, headers});
+        if (res.status === 401) { localStorage.removeItem('accessToken'); window.location.href = '/login'; }
+        return res;
+    }
+
+    // Tải danh sách xe của khách
+    async function loadVehicles() {
+        // Giả sử có API lấy danh sách xe của khách, nếu chưa có thì dùng API riêng hoặc H2.
+        // Ở đây tạm thời lấy từ backend (cần có endpoint GET /api/customers/me/vehicles)
+        // Nếu chưa có, bạn có thể bỏ qua hoặc tạo cứng.
+        try {
+            const res = await fetchWithAuth('/api/customers/me/vehicles');
+            const vehicles = await res.json();
+            const select = document.getElementById('vehicleId');
+            select.innerHTML = '';
+            vehicles.forEach(v => {
+                select.innerHTML += `<option value="${v.id}">${v.licensePlate} - ${v.model}</option>`;
+            });
+        } catch (e) {
+            document.getElementById('result').innerHTML = '<div class="alert alert-warning">Chưa có xe, vui lòng <a href="/create-vehicle">thêm xe</a> trước.</div>';
+        }
+    }
+
+    // Tải gói dịch vụ
+    async function loadPackages() {
+        const res = await fetch('/api/public/services');
+        const packages = await res.json();
+        const select = document.getElementById('packageId');
+        select.innerHTML = '';
+        packages.forEach(p => {
+            select.innerHTML += `<option value="${p.id}" data-price="${p.basePrice}">${p.name} - ${p.basePrice.toLocaleString()} VND</option>`;
+        });
+        updatePrice();
+        select.addEventListener('change', updatePrice);
+    }
+    function updatePrice() {
+        const select = document.getElementById('packageId');
+        const price = select.options[select.selectedIndex]?.getAttribute('data-price') || 0;
+        document.getElementById('totalPrice').value = price;
+    }
+
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const vehicleId = document.getElementById('vehicleId').value;
+        const packageId = document.getElementById('packageId').value;
+        const scheduledTime = document.getElementById('scheduledTime').value;
+        const totalPrice = document.getElementById('totalPrice').value;
+        const body = {vehicleId, packageId: parseInt(packageId), scheduledTime, totalPrice: parseInt(totalPrice)};
+        try {
+            const res = await fetchWithAuth('/api/bookings', {
+                method: 'POST',
+                body: JSON.stringify(body)
+            });
+            if (res.ok) {
+                const booking = await res.json();
+                document.getElementById('result').innerHTML = `<div class="alert alert-success">Đặt lịch thành công! Mã booking: ${booking.id}. <a href="/my-bookings">Xem lịch sử</a></div>`;
+                // Tự động chuyển sang thanh toán? Có thể hiển thị nút thanh toán.
+                setTimeout(() => window.location.href = `/my-bookings`, 2000);
+            } else {
+                const err = await res.json();
+                document.getElementById('result').innerHTML = `<div class="alert alert-danger">Lỗi: ${err.message}</div>`;
+            }
+        } catch (error) {
+            document.getElementById('result').innerHTML = `<div class="alert alert-danger">Lỗi kết nối</div>`;
+        }
+    });
+
+    loadPackages();
+    loadVehicles();
+</script>
+</body>
+</html>

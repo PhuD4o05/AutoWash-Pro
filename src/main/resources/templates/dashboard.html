@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="/dashboard">CarWash</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="/booking">Đặt lịch</a></li>
+        <li class="nav-item"><a class="nav-link" href="/my-bookings">Lịch sử</a></li>
+        <li class="nav-item"><a class="nav-link" href="/create-vehicle">Thêm xe</a></li>
+        <li class="nav-item"><a class="nav-link" href="/live-tracking">Theo dõi</a></li>
+        <li class="nav-item"><a class="nav-link" href="#" id="logoutBtn">Đăng xuất</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<div class="container mt-4">
+  <h3>Xin chào, <span id="customerName"></span>!</h3>
+  <div class="row mt-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Thông tin cá nhân</div>
+        <div class="card-body">
+          <p><strong>Email:</strong> <span id="email"></span></p>
+          <p><strong>SĐT:</strong> <span id="phone"></span></p>
+          <p><strong>Điểm thưởng:</strong> <span id="points"></span></p>
+          <p><strong>Hạng thành viên:</strong> <span id="tier"></span></p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Hành động nhanh</div>
+        <div class="card-body">
+          <a href="/booking" class="btn btn-primary mb-2 w-100">📅 Đặt lịch mới</a>
+          <a href="/my-bookings" class="btn btn-secondary mb-2 w-100">📋 Xem lịch sử</a>
+          <a href="/create-vehicle" class="btn btn-info w-100">🚗 Thêm xe mới</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="mt-4">
+    <h5>📌 3 booking gần nhất</h5>
+    <table class="table table-bordered" id="recentBookings">
+      <thead><tr><th>ID</th><th>Thời gian</th><th>Gói dịch vụ</th><th>Trạng thái</th><th>Tổng tiền</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const token = localStorage.getItem('accessToken');
+  if (!token) window.location.href = '/login';
+
+  // Hàm gọi API có token
+  async function fetchWithAuth(url, options = {}) {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    const res = await fetch(url, {...options, headers});
+    if (res.status === 401) {
+      // token hết hạn -> có thể xử lý refresh nhưng tạm thời chuyển về login
+      localStorage.removeItem('accessToken');
+      window.location.href = '/login';
+    }
+    return res;
+  }
+
+  // Lấy thông tin customer
+  fetchWithAuth('/api/customers/me')
+          .then(res => res.json())
+          .then(customer => {
+            document.getElementById('customerName').innerText = customer.name || customer.fullName;
+            document.getElementById('email').innerText = customer.email;
+            document.getElementById('phone').innerText = customer.phone;
+            // Nếu có loyalty
+            fetchWithAuth('/api/loyalty/me')
+                    .then(res => res.json())
+                    .then(loyalty => {
+                      document.getElementById('points').innerText = loyalty.points || 0;
+                      document.getElementById('tier').innerText = loyalty.tier || 'Thành viên';
+                    })
+                    .catch(() => {});
+          });
+
+  // Lấy 3 booking gần nhất
+  fetchWithAuth('/api/bookings/my-bookings')
+          .then(res => res.json())
+          .then(bookings => {
+            const tbody = document.querySelector('#recentBookings tbody');
+            tbody.innerHTML = '';
+            (bookings.slice(0, 3)).forEach(b => {
+              tbody.innerHTML += `
+                    <tr>
+                        <td>${b.id}</td>
+                        <td>${new Date(b.scheduledTime).toLocaleString()}</td>
+                        <td>${b.packageId}</td>
+                        <td>${b.status}</td>
+                        <td>${b.totalPrice?.toLocaleString()} VND</td>
+                    </tr>
+                `;
+            });
+          });
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('accessToken');
+    window.location.href = '/login';
+  });
+</script>
+</body>
+</html>
