@@ -1,412 +1,795 @@
-use master;
-go
+USE MASTER;
+GO
 
-if DB_ID('AutoWashPro') is not null
-begin
-    alter database AutoWashPro
-    set single_user with rollback immediate;
+IF DB_ID('AutoWashPro') IS NOT NULL
+BEGIN
+    ALTER DATABASE AutoWashPro
+    SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
 
-    drop database AutoWashPro;
-end
-go
+    DROP DATABASE AutoWashPro;
+END
+GO
 
-create database AutoWashPro;
-go
+CREATE DATABASE AutoWashPro;
+GO
 
-use AutoWashPro;
-go
--- ~~~~~					USER DATABASES					~~~~~
-create table UserRoles (
-	RoleID tinyint primary key,
-	RoleName nvarchar(15) not null unique
+USE AutoWashPro;
+GO
+
+
+
+-- ====== CUSTOMERS ======
+CREATE TABLE customers (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    full_name NVARCHAR(100),
+    phone_number NVARCHAR(30) UNIQUE,
+    email NVARCHAR(100),
+    password NVARCHAR(255),
+
+    avatar_url NVARCHAR(255),
+
+    membership_tier NVARCHAR(50),
+    total_points INT,
+    current_points INT,
+
+    is_active BIT,
+    role NVARCHAR(30),
+
+    created_at DATETIME2,
+    updated_at DATETIME2
 );
-go
-insert into UserRoles values
-	(1, 'Admin'),
-	(2, 'Reception'),
-	(3, 'Washer'),
-	(4, 'Customer');
-go
-
-create table Users (
-	UserID int identity primary key,
-	PasswordHash nvarchar(255) not null,
-	FullName nvarchar(50) not null,
-	Phone varchar(15),
-	Email nvarchar(30),
-	RoleID tinyint not null foreign key references UserRoles(RoleID),
-
-	constraint CK_User_Contacts
-	check (
-		nullif(ltrim(rtrim(Phone)), '') is not null or 
-		nullif(ltrim(rtrim(Email)), '') is not null
-	)
-)
-go
-
-create table Staff (
-	UserID int primary key foreign key references Users(UserID),
-	Salary decimal(12,2) not null,
-	ShiftsAbsent int default 0,
-	HireDate date not null,
-
-	constraint CK_AbsentPos
-	check (ShiftsAbsent >= 0),
-
-	constraint CK_ValidSalary
-	check (Salary >= 0)
-)
-go
--- Calculate how long a staff memember has worked
-create function dbo.GetYearsWorked (@HireDate date) 
-returns int as
-begin
-	return (
-		datediff(year, @HireDate, getdate()) -
-		case
-			WHEN dateadd(
-				year,
-				datediff(year, @HireDate, getdate()),
-				@HireDate
-			) > getdate()
-			then 1
-			else 0
-		end
-	);
-end;
-go
- 
-create table MembershipRanks (
-	RankID tinyint primary key,
-	RankName nvarchar(15) not null unique,
-	MinimumPoints int not null,
-
-	constraint CK_Rank_MinimumPoints
-	check (MinimumPoints >= 0)
-)
-go
-insert into MembershipRanks values
-	(1, 'Member', 0),
-	(2, 'Silver', 500),
-	(3, 'Gold', 2000),
-	(4, 'Platinum', 5000);
-go
- 
-create table Customers (
-	UserID int primary key foreign key references Users(UserID),
-	Points int not null default 0,
-	RankID tinyint not null default 1 foreign key references MembershipRanks(RankID),
-
-	constraint CK_Customer_ValidPoints
-	check (Points >= 0)
-)
-go
-
-create table Cars (
-	LicensePlate nvarchar(25) primary key,
-	UserID int not null foreign key references Customers(UserID),
-	Brand nvarchar(50),
-	Model nvarchar(50),
-	Color nvarchar(15)
-)
-go
-
-create table DaysOfWeek (
-	WorkDays tinyint primary key,
-	[DayName] nvarchar(10) not null unique
-)
-go
-insert into DaysOfWeek (WorkDays, DayName)
-values
-	(1, 'Monday'),
-	(2, 'Tuesday'),
-	(3, 'Wednesday'),
-	(4, 'Thursday'),
-	(5, 'Friday'),
-	(6, 'Saturday'),
-	(7, 'Sunday');
-go
-
-create table Shifts (
-	ShiftID int identity primary key,
-	UserID int not null,
-	WorkDays tinyint not null,
-	StartTime time not null,
-	EndTime time not null,
-	IsAbsent bit not null default 0,
-
-	constraint CK_ValidShift
-	check (WorkDays between 1 and 7 and StartTime < EndTime),
-	
-	foreign key (UserID) references Staff(UserID),
-	foreign key (WorkDays) references DaysOfWeek(WorkDays)
-)
-go
-
-create procedure MarkAbsent @ShiftID int
-as
-begin
-	if exists (
-		select 1 from Shifts
-		where ShiftID = @ShiftID and IsAbsent = 0
-	)
-	begin
-		update Shifts
-		set IsAbsent = 1
-		where ShiftID = @ShiftID
-	
-		update Staff
-		set ShiftsAbsent = ShiftsAbsent + 1
-		where UserID = (
-			select UserID from Shifts
-				where ShiftID = @ShiftID
-		);
-	end
-end;
-go
+GO
 
 
--- ~~~~~					BOOKING DATABASE					~~~~~
-create table BookingStatus (
-	StatusID tinyint primary key,
-	StatusName nvarchar(25) not null unique
+
+-- ====== RECEPTIONISTS ======
+CREATE TABLE receptionists (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    full_name NVARCHAR(100),
+    phone_number NVARCHAR(30) UNIQUE,
+    email NVARCHAR(100),
+    password NVARCHAR(255),
+
+    is_active BIT,
+    role NVARCHAR(30),
+
+    created_at DATETIME2,
+    updated_at DATETIME2
 );
-go
-insert into BookingStatus values
-	(1, 'Pending'),
-	(2, 'Confirmed'),
-	(3, 'Checked In'),
-	(4, 'Waiting'),
-	(5, 'Washing'),
-	(6, 'Completed'),
-	(7, 'Cancelled');
-go
+GO
 
-create table [Services] (
-	ServiceID int identity primary key,
-	ServicePackage nvarchar(50) not null unique,
-	Price decimal(12,2) not null,
-	ServiceDuration int not null,
-	IsActive bit not null default 1,
 
-	constraint CK_Price
-	check (Price > 0),
 
-	constraint CK_ServiceDuration
-	check (ServiceDuration > 0)
-)
-insert into [Services] (ServicePackage, Price, ServiceDuration) values
-	('Express Wash', 50000, 10),
-	('Basic Wash', 120000, 45),
-	('Premium Wash', 200000, 60),
-	('Luxury Wash', 500000, 120),
-	('Basic Interior Care', 50000, 30),
-	('Deep Interior Detailing', 1700000, 360),
-	('Interior Odor Elimination', 150000, 60),
-	('Wheel Rim Detailing', 450000, 45),
-	('Glass Water Spot Removal', 400000, 60),
-	('Engine Bay Detailing', 700000, 120);
-go
+-- ====== WASHERS ======
+CREATE TABLE washers (
+    id BIGINT IDENTITY PRIMARY KEY,
 
-create table Bookings (
-	BookingID int identity primary key,
-	UserID int foreign key references Customers(UserID),
-	LicensePlate nvarchar(25) not null foreign key references Cars(LicensePlate),
+    full_name NVARCHAR(100) NOT NULL,
 
-	ServiceID int not null foreign key references [Services](ServiceID),
-	PaymentMethod nvarchar(25) not null,
+    phone_number NVARCHAR(30) NOT NULL UNIQUE,
 
-	BookTime datetime not null,
-	CurrentStatus tinyint not null foreign key references BookingStatus(StatusID),
-	CompletedAt datetime,
+    email NVARCHAR(100),
+    password NVARCHAR(255),
 
-	constraint CK_PaymentMethod
-	check (
-		PaymentMethod in ('Cash', 'Online Bank Transfer')
-	)
+    is_active BIT,
+    role NVARCHAR(30),
+
+    created_at DATETIME2,
+    updated_at DATETIME2
 );
-go
+GO
 
-create table BookingAssignments (
-	BookingID int not null foreign key references Bookings(BookingID),
-	UserID int not null foreign key references Staff(UserID),
 
-	primary key(BookingID, UserID)
+
+-- ====== VEHICLES ======
+CREATE TABLE vehicles (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    license_plate NVARCHAR(30) UNIQUE,
+    brand NVARCHAR(50),
+    model NVARCHAR(50),
+    color NVARCHAR(30),
+
+    image_url NVARCHAR(255),
+
+    customer_id BIGINT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_Vehicle_Customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id)
 );
-go
+GO
 
-create table BookingStatusHistory (
-	HistoryID int identity primary key,
 
-	BookingID int not null foreign key references Bookings(BookingID),
-	StatusID tinyint not null foreign key references BookingStatus(StatusID),
 
-	ChangedAt datetime not null default getdate()
+-- ====== SERVICE PACKAGES ======
+CREATE TABLE service_packages (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    name NVARCHAR(100) NOT NULL UNIQUE,
+
+    description NVARCHAR(MAX),
+
+    estimated_minutes INT,
+    base_price DECIMAL(12,2),
+
+    is_active BIT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2
 );
-go
+GO
 
--- ~~~~~					TRANSACTIONS DATABASE				~~~~~
-create table PaymentStatus (
-	StatusID tinyint primary key,
-	StatusName nvarchar(15) not null unique
-)
-go
-insert into PaymentStatus values
-	(1, 'Pending'),
-	(2, 'Paid'),
-	(3, 'Refunded');
-go
 
-create table Payments (
-	PaymentID int identity primary key,
-	BookingID int not null unique foreign key references Bookings(BookingID),
 
-	Amount decimal(12,2) not null,
-	PaymentDate datetime not null default getDate(),
-	StatusID tinyint not null foreign key references PaymentStatus(StatusID),
+-- ====== WASH BAYS ======
+CREATE TABLE wash_bays (
+    id BIGINT IDENTITY PRIMARY KEY,
 
-	constraint CK_PaymentAmount
-	check (Amount >= 0)
+    bay_number NVARCHAR(50) NOT NULL UNIQUE,
+
+    status NVARCHAR(30)
 );
-go
-
-create table PointsTransactions (
-	TransactionID int identity primary key,
-	PaymentID int foreign key references Payments(PaymentID),
-	UserID int not null foreign key references Customers(UserID),
-
-	PointsChanged int not null,
-	[Description] nvarchar(100),
-	TransactionDate datetime not null default getDate(),
-
-	constraint CK_PointsTransaction
-	check (PointsChanged <> 0)
-)
-go
-
-create trigger TR_PointsTransaction_Sync
-on PointsTransactions
-after insert, update, delete
-as
-begin
-	set nocount on;
-
-	-- Remove old values
-	update c
-	set c.Points = c.Points - d.TotalPoints
-	from Customers c
-	join (
-		select UserID, sum(PointsChanged) as TotalPoints
-		from deleted
-		group by UserID
-	) d
-		on c.UserID = d.UserID;
-
-	-- Add new values
-	update c
-	set c.Points = c.Points + i.TotalPoints
-	from Customers c
-	join (
-		select UserID, sum(PointsChanged) as TotalPoints
-		from inserted
-		group by UserID
-	) i
-		on c.UserID = i.UserID;
-
-	-- Update customer ranks
-    update c
-    set RankID = r.RankID
-    from Customers c
-    cross apply (
-        select top 1 RankID
-        from MembershipRanks
-        where MinimumPoints <= c.Points
-        order by MinimumPoints desc
-    ) r;
-end;
-go
+GO
 
 
--- ==================== INSERT DATA ==========================
-insert into Users (PasswordHash, FullName, Phone, Email, RoleID) values
-	('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn', 1),
-	('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn', 2),
-	('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn', 3),
-	('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn', 3),
-	('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com', 4),
-	('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com', 4),
-	('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com', 4);
 
-insert into Staff (UserID, Salary, HireDate) values
-	(2, 12000000, '2024-01-15'),
-	(3, 9000000, '2024-03-01'),
-	(4, 9500000, '2024-05-20');
+-- ====== BOOKINGS ======
+CREATE TABLE bookings (
+    id BIGINT IDENTITY PRIMARY KEY,
 
-insert into Customers (UserID, Points, RankID) values
-	(5, 350, 1),
-	(6, 1200, 2),
-	(7, 2500, 3);
+    customer_id BIGINT,
+    vehicle_id BIGINT,
+    service_package_id BIGINT,
 
-insert into Cars (LicensePlate, UserID, Brand, Model, Color) values
-	('51A-12345', 5, 'Toyota', 'Vios', 'White'),
-	('59B-67890', 6, 'Honda', 'City', 'Black'),
-	('60C-88888', 7, 'Mazda', 'CX-5', 'Red'),
-	('51H-55555', 5, 'Hyundai', 'Accent', 'Silver');
+    scheduled_time DATETIME2,
+    checkin_time DATETIME2,
+    completed_time DATETIME2,
 
-insert into Shifts (UserID, WorkDays, StartTime, EndTime) values
-	(2, 1, '08:00', '17:00'),
-	(2, 2, '08:00', '17:00'),
+    status NVARCHAR(30),
 
-	(3, 1, '08:00', '17:00'),
-	(3, 3, '08:00', '17:00'),
+    qr_code NVARCHAR(255),
 
-	(4, 2, '08:00', '17:00'),
-	(4, 4, '08:00', '17:00');
+    total_price DECIMAL(12,2),
 
-insert into Bookings
+    voucher_code NVARCHAR(100),
+
+    assigned_washer_id BIGINT,
+    assigned_bay_id BIGINT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_Booking_Customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id),
+
+    CONSTRAINT FK_Booking_Vehicle
+        FOREIGN KEY(vehicle_id)
+        REFERENCES vehicles(id),
+
+    CONSTRAINT FK_Booking_ServicePackage
+        FOREIGN KEY(service_package_id)
+        REFERENCES service_packages(id),
+
+    CONSTRAINT FK_Booking_Washer
+        FOREIGN KEY(assigned_washer_id)
+        REFERENCES washers(id),
+
+    CONSTRAINT FK_Booking_WashBay
+        FOREIGN KEY(assigned_bay_id)
+        REFERENCES wash_bays(id)
+);
+GO
+
+
+
+-- ====== PAYMENTS ======
+CREATE TABLE payments (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    booking_id BIGINT UNIQUE,
+
+    amount DECIMAL(12,2),
+
+    method NVARCHAR(30),
+    status NVARCHAR(30),
+
+    transaction_id NVARCHAR(255),
+
+    paid_at DATETIME2,
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_Payment_Booking
+        FOREIGN KEY(booking_id)
+        REFERENCES bookings(id)
+);
+GO
+
+
+
+-- ====== LOYALTY TRANSACTIONS ======
+CREATE TABLE loyalty_transactions (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    customer_id BIGINT NOT NULL,
+
+    booking_id BIGINT,
+
+    type NVARCHAR(30),
+
+    points INT,
+
+    description NVARCHAR(500),
+
+    created_at DATETIME2,
+
+    CONSTRAINT FK_Loyalty_Customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id),
+
+    CONSTRAINT FK_Loyalty_Booking
+        FOREIGN KEY(booking_id)
+        REFERENCES bookings(id)
+);
+GO
+
+
+
+-- ====== PROMOTIONS ======
+CREATE TABLE promotions (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    code NVARCHAR(100),
+
+    name NVARCHAR(255),
+    description NVARCHAR(MAX),
+
+    applicable_tier NVARCHAR(50),
+
+    discount_percent INT,
+    discount_amount BIGINT,
+
+    start_date DATETIME2,
+    end_date DATETIME2,
+
+    is_active BIT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2
+);
+GO
+
+
+
+-- ====== VOUCHERS ======
+CREATE TABLE vouchers (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    code NVARCHAR(100),
+
+    description NVARCHAR(MAX),
+
+    discount_percent INT,
+    discount_amount BIGINT,
+
+    required_points INT,
+
+    valid_from DATETIME2,
+    valid_until DATETIME2,
+
+    is_active BIT,
+
+    promotion_id BIGINT,
+    customer_id BIGINT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_Voucher_Promotion
+        FOREIGN KEY(promotion_id)
+        REFERENCES promotions(id),
+
+    CONSTRAINT FK_Voucher_Customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id)
+);
+GO
+
+
+
+-- ===== NOTIFICATIONS ======
+CREATE TABLE notifications (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    title NVARCHAR(255),
+    message NVARCHAR(MAX),
+
+    is_read BIT,
+
+    customer_id BIGINT,
+
+    created_at DATETIME2,
+
+    CONSTRAINT FK_Notification_Customer
+        FOREIGN KEY(customer_id)
+        REFERENCES customers(id)
+);
+GO
+
+
+
+-- ====== WORK SHIFTS ======
+CREATE TABLE work_shifts (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    washer_id BIGINT NOT NULL,
+
+    shift_date DATE,
+    shift_type NVARCHAR(20),
+
+    start_time TIME,
+    end_time TIME,
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_WorkShift_Washer
+        FOREIGN KEY (washer_id)
+        REFERENCES washers(id)
+);
+GO
+
+
+
+-- ====== ASSIGNMENTS ======
+CREATE TABLE assignments (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    booking_id BIGINT,
+    washer_id BIGINT,
+    work_shift_id BIGINT,
+    wash_bay_id BIGINT,
+
+    start_time DATETIME2,
+    end_time DATETIME2,
+
+    status NVARCHAR(50),
+
+    created_at DATETIME2,
+    updated_at DATETIME2,
+
+    CONSTRAINT FK_Assignment_Booking
+        FOREIGN KEY (booking_id)
+        REFERENCES bookings(id),
+
+    CONSTRAINT FK_Assignment_Washer
+        FOREIGN KEY (washer_id)
+        REFERENCES washers(id),
+
+    CONSTRAINT FK_Assignment_WorkShift
+        FOREIGN KEY (work_shift_id)
+        REFERENCES work_shifts(id),
+
+    CONSTRAINT FK_Assignment_WashBay
+        FOREIGN KEY (wash_bay_id)
+        REFERENCES wash_bays(id)
+);
+GO
+
+
+
+-- ====== WASH QUEUE ======
+CREATE TABLE wash_queue (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    booking_id BIGINT NOT NULL UNIQUE,
+
+    queue_position INT,
+
+    enqueued_at DATETIME2,
+
+    status NVARCHAR(30),
+
+    started_at DATETIME2,
+    finished_at DATETIME2,
+
+    CONSTRAINT FK_WashQueue_Booking
+        FOREIGN KEY(booking_id)
+        REFERENCES bookings(id)
+);
+GO
+
+
+
+-- ====== DYNAMIC PRICE RULES ======
+CREATE TABLE dynamic_price_rules (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    rule_name NVARCHAR(255),
+
+    is_weekend BIT,
+    is_holiday BIT,
+
+    specific_date DATE,
+
+    applicable_tier NVARCHAR(50),
+
+    percent_adjustment INT,
+
+    is_active BIT,
+
+    created_at DATETIME2,
+    updated_at DATETIME2
+);
+GO
+
+
+
+-- ====== REFRESH TOKENS ======
+CREATE TABLE refresh_tokens (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    token NVARCHAR(500) NOT NULL UNIQUE,
+
+    username NVARCHAR(100) NOT NULL,
+
+    expiry_date DATETIME2 NOT NULL,
+
+    revoked BIT
+);
+GO
+
+
+
+-- ====== ANALYTICS REPORTS ======
+CREATE TABLE analytics_reports (
+    id BIGINT IDENTITY PRIMARY KEY,
+
+    report_date DATE,
+
+    report_type NVARCHAR(50),
+
+    total_bookings BIGINT,
+    total_revenue BIGINT,
+    total_customers BIGINT,
+
+    top_service NVARCHAR(255),
+
+    data_json NVARCHAR(MAX),
+
+    created_at DATETIME2
+);
+GO
+
+
+
+
+-- ~~~~~~~~~~~~~~~~~~~~~~~~ INSERT DATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-- ====== CUSTOMER DATA ======
+INSERT INTO customers
 (
-	UserID,
-	LicensePlate,
-	ServiceID,
-	PaymentMethod,
-	BookTime,
-	CurrentStatus
+    full_name,
+    phone_number,
+    email,
+    password,
+    avatar_url,
+    membership_tier,
+    total_points,
+    current_points,
+    is_active,
+    role,
+    created_at,
+    updated_at
 )
-values
-	(5, '51A-12345', 2, 'Cash', '2026-06-10 09:00:00', 2),
-	(6, '59B-67890', 3, 'Online Bank Transfer', '2026-06-10 13:00:00', 5),
-	(7, '60C-88888', 4, 'Cash', '2026-06-11 10:00:00', 1);
-
-insert into BookingAssignments (BookingID, UserID) values
-	(1, 3),
-	(2, 4),
-	(3, 3),
-	(3, 4);
-		
-insert into BookingStatusHistory (BookingID, StatusID) values
-	(1, 1),
-	(1, 2),
-
-	(2, 1),
-	(2, 2),
-	(2, 3),
-	(2, 4),
-	(2, 5),
-
-	(3, 1);
-
-insert into Payments (BookingID, Amount, StatusID) values
-	(1, 120000, 2),
-	(2, 200000, 2),
-	(3, 500000, 1);
-
-insert into PointsTransactions
+VALUES
 (
-	PaymentID,
-	UserID,
-	PointsChanged,
-	[Description]
+    N'Nguyen Van A',
+    '0901234567',
+    'customer1@gmail.com',
+    '$2a$10$dummyHash',
+    NULL,
+    'MEMBER',
+    0,
+    0,
+    1,
+    'CUSTOMER',
+    GETDATE(),
+    GETDATE()
+),
+(
+    N'Tran Thi B',
+    '0907654321',
+    'customer2@gmail.com',
+    '$2a$10$dummyHash',
+    NULL,
+    'SILVER',
+    1500,
+    1500,
+    1,
+    'CUSTOMER',
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== WASHER DATA ======
+INSERT INTO washers
+(
+    full_name,
+    phone_number,
+    email,
+    password,
+    is_active,
+    role,
+    created_at,
+    updated_at
 )
-values
-	(1, 5, 120, 'Points earned from Basic Wash'),
-	(2, 6, 200, 'Points earned from Premium Wash');
+VALUES
+(
+    N'Pham Washer 1',
+    '0911111111',
+    'washer1@gmail.com',
+    '$2a$10$dummyHash',
+    1,
+    'WASHER',
+    GETDATE(),
+    GETDATE()
+),
+(
+    N'Pham Washer 2',
+    '0922222222',
+    'washer2@gmail.com',
+    '$2a$10$dummyHash',
+    1,
+    'WASHER',
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== RECEPTIONIST DATA ======
+INSERT INTO receptionists
+(
+    full_name,
+    phone_number,
+    email,
+    password,
+    is_active,
+    role,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    N'Le Reception',
+    '0933333333',
+    'reception@gmail.com',
+    '$2a$10$dummyHash',
+    1,
+    'RECEPTIONIST',
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== SERVICE PACKAGE DATA ======
+INSERT INTO service_packages
+(
+    name,
+    description,
+    estimated_minutes,
+    base_price,
+    is_active,
+    created_at,
+    updated_at
+)
+VALUES
+('Express Wash', 'Quick exterior wash', 15, 50000, 1, GETDATE(), GETDATE()),
+('Basic Wash', 'Exterior cleaning', 30, 100000, 1, GETDATE(), GETDATE()),
+('Premium Wash', 'Exterior + interior cleaning', 60, 250000, 1, GETDATE(), GETDATE()),
+('Luxury Detail', 'Full detailing package', 180, 800000, 1, GETDATE(), GETDATE());
+GO
+
+
+
+-- ====== WASH BAY DATA ======
+INSERT INTO wash_bays
+(
+    bay_number,
+    status
+)
+VALUES
+('BAY-01', 'AVAILABLE'),
+('BAY-02', 'AVAILABLE'),
+('BAY-03', 'AVAILABLE');
+GO
+
+
+
+-- ====== VEHICLE DATA ======
+INSERT INTO vehicles
+(
+    license_plate,
+    brand,
+    model,
+    color,
+    image_url,
+    customer_id,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    '51A-12345',
+    'Toyota',
+    'Vios',
+    'White',
+    NULL,
+    1,
+    GETDATE(),
+    GETDATE()
+),
+(
+    '59B-88888',
+    'Honda',
+    'City',
+    'Black',
+    NULL,
+    2,
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== WORK SHIFT DATA ======
+INSERT INTO work_shifts
+(
+    washer_id,
+    shift_date,
+    shift_type,
+    start_time,
+    end_time,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    1,
+    '2026-06-21',
+    'MORNING',
+    '08:00',
+    '12:00',
+    GETDATE(),
+    GETDATE()
+),
+(
+    2,
+    '2026-06-21',
+    'AFTERNOON',
+    '13:00',
+    '17:00',
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== BOOKING DATA ======
+INSERT INTO bookings
+(
+    customer_id,
+    vehicle_id,
+    service_package_id,
+    scheduled_time,
+    status,
+    total_price,
+    assigned_washer_id,
+    assigned_bay_id,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    1,
+    1,
+    1,
+    DATEADD(HOUR, 2, GETDATE()),
+    'CONFIRMED',
+    100000,
+    1,
+    1,
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== PAYMENT DATA ======
+INSERT INTO payments
+(
+    booking_id,
+    amount,
+    method,
+    status,
+    transaction_id,
+    paid_at,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    1,
+    100000,
+    'CASH',
+    'PAID',
+    'TXN001',
+    GETDATE(),
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== ASSIGNMENT DATA ======
+INSERT INTO assignments
+(
+    booking_id,
+    washer_id,
+    work_shift_id,
+    wash_bay_id,
+    start_time,
+    status,
+    created_at,
+    updated_at
+)
+VALUES
+(
+    1,
+    1,
+    1,
+    1,
+    GETDATE(),
+    'ACTIVE',
+    GETDATE(),
+    GETDATE()
+);
+GO
+
+
+
+-- ====== WASH QUEUE DATA ======
+INSERT INTO wash_queue
+(
+    booking_id,
+    queue_position,
+    enqueued_at,
+    status
+)
+VALUES
+(
+    1,
+    1,
+    GETDATE(),
+    'WAITING'
+);
+GO
