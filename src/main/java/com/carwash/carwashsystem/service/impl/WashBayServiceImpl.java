@@ -3,10 +3,12 @@ package com.carwash.carwashsystem.service.impl;
 import com.carwash.carwashsystem.dto.request.AssignBayRequest;
 import com.carwash.carwashsystem.dto.response.WashBayResponse;
 import com.carwash.carwashsystem.entity.Assignment;
+import com.carwash.carwashsystem.entity.Booking;
 import com.carwash.carwashsystem.entity.WashBay;
 import com.carwash.carwashsystem.entity.Washer;
 import com.carwash.carwashsystem.enums.WashBayStatus;
 import com.carwash.carwashsystem.repository.AssignmentRepository;
+import com.carwash.carwashsystem.repository.BookingRepository;
 import com.carwash.carwashsystem.repository.WashBayRepository;
 import com.carwash.carwashsystem.repository.WasherRepository;
 import com.carwash.carwashsystem.service.interfaces.WashBayService;
@@ -25,6 +27,7 @@ public class WashBayServiceImpl implements WashBayService {
     private final WashBayRepository washBayRepository;
     private final AssignmentRepository assignmentRepository;
     private final WasherRepository washerRepository;
+    private final BookingRepository bookingRepository;
 
     @Override
     public List<WashBay> getAllBays() {
@@ -63,13 +66,16 @@ public class WashBayServiceImpl implements WashBayService {
                 .orElseThrow(() -> new RuntimeException("Washer not found"));
 
         // Tạo assignment mới
+        Booking booking = bookingRepository.findById(request.getBookingId())
+            .orElseThrow(() -> new RuntimeException("Booking not found"));
+
         Assignment assignment = Assignment.builder()
-                .bookingId(request.getBookingId())
-                .washBay(bay)
-                .washer(washer)
-                .startTime(LocalDateTime.now())
-                .status("ACTIVE")
-                .build();
+            .booking(booking)
+            .washBay(bay)
+            .washer(washer)
+            .startTime(LocalDateTime.now())
+            .status("ACTIVE")
+            .build();
         assignmentRepository.save(assignment);
 
         return toResponse(bay);

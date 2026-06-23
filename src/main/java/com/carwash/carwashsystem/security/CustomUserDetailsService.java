@@ -1,8 +1,8 @@
 package com.carwash.carwashsystem.security;
 
-import com.carwash.carwashsystem.entity.Customer;
-import com.carwash.carwashsystem.entity.Receptionist;
-import com.carwash.carwashsystem.entity.Washer;
+//import com.carwash.carwashsystem.entity.Customer;
+//import com.carwash.carwashsystem.entity.Receptionist;
+//import com.carwash.carwashsystem.entity.Washer;
 import com.carwash.carwashsystem.repository.CustomerRepository;
 import com.carwash.carwashsystem.repository.ReceptionistRepository;
 import com.carwash.carwashsystem.repository.WasherRepository;
@@ -28,6 +28,17 @@ public class CustomUserDetailsService implements UserDetailsService {
 //                .or(() -> washerRepository.findByPhoneNumber(username).map(UserPrincipal::create))
 //                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 //    }
+    public UserDetails loadUserById(Long id) {
+        return customerRepository.findById(id)
+            .map(UserPrincipal::create)
+            .or(() -> receptionistRepository.findById(id)
+                    .map(UserPrincipal::create))
+            .or(() -> washerRepository.findById(id)
+                    .map(UserPrincipal::create))
+            .orElseThrow(() ->
+                    new UsernameNotFoundException("User not found"));
+    }
+    
     @Override
     public UserDetails loadUserByUsername(String username) {
           return customerRepository.findByEmail(username)
