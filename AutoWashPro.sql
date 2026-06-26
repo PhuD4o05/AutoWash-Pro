@@ -35,6 +35,7 @@ create table Users (
 	Phone varchar(15),
 	Email nvarchar(30),
 	RoleID tinyint not null foreign key references UserRoles(RoleID),
+	IsActive bit not null,
 
 	constraint CK_User_Contacts
 	check (
@@ -328,14 +329,14 @@ go
 
 
 -- ==================== INSERT DATA ==========================
-insert into Users (PasswordHash, FullName, Phone, Email, RoleID) values
-	('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn', 1),
-	('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn', 2),
-	('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn', 3),
-	('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn', 3),
-	('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com', 4),
-	('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com', 4),
-	('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com', 4);
+insert into Users (PasswordHash, FullName, Phone, Email, RoleID, IsActive) values
+	('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn', 1, 1),
+	('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn', 2, 1),
+	('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn', 3, 1),
+	('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn', 3, 1),
+	('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com', 4, 1),
+	('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com', 4, 1),
+	('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com', 4, 1);
 
 insert into Staff (UserID, Salary, HireDate) values
 	(2, 12000000, '2024-01-15'),
