@@ -28,16 +28,37 @@ insert into UserRoles values
 	(4, 'Customer');
 go
 
-create table Users (
+create table Customer (
 	UserID int identity primary key,
 	PasswordHash nvarchar(255) not null,
 	FullName nvarchar(50) not null,
 	Phone varchar(15),
-	Email nvarchar(30),
+	Email nvarchar(255),
+	avatarUrl nvarchar(500) null,
+
+	createdAt datetime2 null default getDate(),
+	updatedAt datetime2 null default getDate(),
+
 	RoleID tinyint not null foreign key references UserRoles(RoleID),
 	IsActive bit not null,
 
-	constraint CK_User_Contacts
+	Points int not null default 0,
+	RankID tinyint not null default 1 foreign key references MembershipRanks(RankID),
+
+	Salary decimal(12,2) not null,
+	ShiftsAbsent int default 0,
+	HireDate date not null,
+
+	constraint CK_Customer_ValidPoints
+	check (Points >= 0)
+
+	constraint CK_AbsentPos
+	check (ShiftsAbsent >= 0),
+
+	constraint CK_ValidSalary
+	check (Salary >= 0)
+
+	constraint CK_Contacts
 	check (
 		nullif(ltrim(rtrim(Phone)), '') is not null or 
 		nullif(ltrim(rtrim(Email)), '') is not null
@@ -45,19 +66,21 @@ create table Users (
 )
 go
 
-create table Staff (
-	UserID int primary key foreign key references Users(UserID),
-	Salary decimal(12,2) not null,
-	ShiftsAbsent int default 0,
-	HireDate date not null,
+--create table Staff (
+--	UserID int primary key foreign key references Users(UserID),
+--	Salary decimal(12,2) not null,
+--	ShiftsAbsent int default 0,
+--	HireDate date not null,
 
-	constraint CK_AbsentPos
-	check (ShiftsAbsent >= 0),
+--	constraint CK_AbsentPos
+--	check (ShiftsAbsent >= 0),
 
-	constraint CK_ValidSalary
-	check (Salary >= 0)
-)
-go
+--	constraint CK_ValidSalary
+--	check (Salary >= 0)
+--)
+--go
+
+
 -- Calculate how long a staff memember has worked
 create function dbo.GetYearsWorked (@HireDate date) 
 returns int as
@@ -93,15 +116,17 @@ insert into MembershipRanks values
 	(4, 'Platinum', 5000);
 go
  
-create table Customers (
-	UserID int primary key foreign key references Users(UserID),
-	Points int not null default 0,
-	RankID tinyint not null default 1 foreign key references MembershipRanks(RankID),
 
-	constraint CK_Customer_ValidPoints
-	check (Points >= 0)
-)
-go
+--create table Customers (
+--	UserID int primary key foreign key references Users(UserID),
+--	Points int not null default 0,
+--	RankID tinyint not null default 1 foreign key references MembershipRanks(RankID),
+
+--	constraint CK_Customer_ValidPoints
+--	check (Points >= 0)
+--)
+--go
+
 
 create table Cars (
 	LicensePlate nvarchar(25) primary key,
