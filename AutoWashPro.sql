@@ -1,20 +1,3 @@
-use master;
-go
-
-if DB_ID('AutoWashPro') is not null
-begin
-    alter database AutoWashPro
-    set single_user with rollback immediate;
-
-    drop database AutoWashPro;
-end
-go
-
-create database AutoWashPro;
-go
-
-use AutoWashPro;
-go
 -- ~~~~~					USER DATABASES					~~~~~
 create table UserRoles (
 	RoleID tinyint primary key,
@@ -27,13 +10,29 @@ insert into UserRoles values
 	(3, 'Washer'),
 	(4, 'Customer');
 go
+ 
+create table MembershipTiers (
+	TierID tinyint primary key,
+	TierName nvarchar(15) not null unique,
+	MinimumPoints int not null,
 
-create table Customer (
+	constraint CK_Rank_MinimumPoints
+	check (MinimumPoints >= 0)
+)
+go
+insert into MembershipTiers values
+	(1, 'Member', 0),
+	(2, 'Silver', 500),
+	(3, 'Gold', 2000),
+	(4, 'Platinum', 5000);
+go
+
+create table Customers (
 	UserID int identity primary key,
 	PasswordHash nvarchar(255) not null,
 	FullName nvarchar(50) not null,
-	Phone varchar(15),
-	Email nvarchar(255),
+	Phone varchar(15) unique,
+	Email nvarchar(255) unique,
 	avatarUrl nvarchar(500) null,
 
 	createdAt datetime2 null default getDate(),
@@ -42,21 +41,21 @@ create table Customer (
 	RoleID tinyint not null foreign key references UserRoles(RoleID),
 	IsActive bit not null,
 
-	Points int not null default 0,
-	RankID tinyint not null default 1 foreign key references MembershipRanks(RankID),
+	Points int default 0,
+	TierID tinyint default 1 foreign key references MembershipTiers(TierID),
 
-	Salary decimal(12,2) not null,
+	Salary decimal(12,2),
 	ShiftsAbsent int default 0,
-	HireDate date not null,
+	HireDate date,
 
 	constraint CK_Customer_ValidPoints
-	check (Points >= 0)
+	check (Points >= 0),
 
 	constraint CK_AbsentPos
 	check (ShiftsAbsent >= 0),
 
 	constraint CK_ValidSalary
-	check (Salary >= 0)
+	check (Salary >= 0),
 
 	constraint CK_Contacts
 	check (
@@ -82,39 +81,23 @@ go
 
 
 -- Calculate how long a staff memember has worked
-create function dbo.GetYearsWorked (@HireDate date) 
-returns int as
-begin
-	return (
-		datediff(year, @HireDate, getdate()) -
-		case
-			WHEN dateadd(
-				year,
-				datediff(year, @HireDate, getdate()),
-				@HireDate
-			) > getdate()
-			then 1
-			else 0
-		end
-	);
-end;
-go
- 
-create table MembershipRanks (
-	RankID tinyint primary key,
-	RankName nvarchar(15) not null unique,
-	MinimumPoints int not null,
-
-	constraint CK_Rank_MinimumPoints
-	check (MinimumPoints >= 0)
-)
-go
-insert into MembershipRanks values
-	(1, 'Member', 0),
-	(2, 'Silver', 500),
-	(3, 'Gold', 2000),
-	(4, 'Platinum', 5000);
-go
+--create function dbo.GetYearsWorked (@HireDate date) 
+--returns int as
+--begin
+--	return (
+--		datediff(year, @HireDate, getdate()) -
+--		case
+--			WHEN dateadd(
+--				year,
+--				datediff(year, @HireDate, getdate()),
+--				@HireDate
+--			) > getdate()
+--			then 1
+--			else 0
+--		end
+--	);
+--end;
+--go
  
 
 --create table Customers (
@@ -164,7 +147,7 @@ create table Shifts (
 	constraint CK_ValidShift
 	check (WorkDays between 1 and 7 and StartTime < EndTime),
 	
-	foreign key (UserID) references Staff(UserID),
+	foreign key (UserID) references Customers(UserID),
 	foreign key (WorkDays) references DaysOfWeek(WorkDays)
 )
 go
@@ -181,7 +164,7 @@ begin
 		set IsAbsent = 1
 		where ShiftID = @ShiftID
 	
-		update Staff
+		update Customers
 		set ShiftsAbsent = ShiftsAbsent + 1
 		where UserID = (
 			select UserID from Shifts
@@ -255,7 +238,7 @@ go
 
 create table BookingAssignments (
 	BookingID int not null foreign key references Bookings(BookingID),
-	UserID int not null foreign key references Staff(UserID),
+	UserID int not null foreign key references Customers(UserID),
 
 	primary key(BookingID, UserID)
 );
@@ -270,6 +253,7 @@ create table BookingStatusHistory (
 	ChangedAt datetime not null default getdate()
 );
 go
+
 
 -- ~~~~~					TRANSACTIONS DATABASE				~~~~~
 create table PaymentStatus (
@@ -341,11 +325,11 @@ begin
 
 	-- Update customer ranks
     update c
-    set RankID = r.RankID
+    set TierID = r.TierID
     from Customers c
     cross apply (
-        select top 1 RankID
-        from MembershipRanks
+        select top 1 TierID
+        from MembershipTiers
         where MinimumPoints <= c.Points
         order by MinimumPoints desc
     ) r;
@@ -353,25 +337,66 @@ end;
 go
 
 
+-- ~~~~~               BACKEND DATABASES          ~~~~~
+create table RefreshTokens (
+	RefreshTokenID int identity primary key,
+    Username varchar(15) not null unique foreign key references Customers(Phone),
+
+    Token nvarchar(500) not null unique,
+    CreatedAt datetime2 not null default getdate(),
+    ExpiresAt datetime2 not null,
+    Revoked bit not null default 0,
+
+    constraint CK_RefreshToken_Expiry
+    check (ExpiresAt > CreatedAt)
+);
+go
+
 -- ==================== INSERT DATA ==========================
-insert into Users (PasswordHash, FullName, Phone, Email, RoleID, IsActive) values
-	('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn', 1, 1),
-	('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn', 2, 1),
-	('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn', 3, 1),
-	('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn', 3, 1),
-	('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com', 4, 1),
-	('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com', 4, 1),
-	('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com', 4, 1);
+insert into Customers
+(
+    PasswordHash,
+    FullName,
+    Phone,
+    Email,
+    RoleID,
+    IsActive,
+    Points,
+    TierID,
+    Salary,
+    ShiftsAbsent,
+    HireDate
+)
+values
+-- Admin
+('admin123hash', 'Nguyen Van Admin', '0901111111', 'admin@autowash.vn',
+ 1, 1, 0, 1, NULL, NULL, NULL),
 
-insert into Staff (UserID, Salary, HireDate) values
-	(2, 12000000, '2024-01-15'),
-	(3, 9000000, '2024-03-01'),
-	(4, 9500000, '2024-05-20');
+-- Receptionist
+('recep123hash', 'Tran Thi Reception', '0902222222', 'reception@autowash.vn',
+ 2, 1, 0, 1, 12000000, 0, '2024-01-15'),
 
-insert into Customers (UserID, Points, RankID) values
-	(5, 350, 1),
-	(6, 1200, 2),
-	(7, 2500, 3);
+-- Washer 1
+('washer123hash', 'Le Van Washer', '0903333333', 'washer1@autowash.vn',
+ 3, 1, 0, 1, 9000000, 0, '2024-03-01'),
+
+-- Washer 2
+('washer456hash', 'Pham Van Washer', '0904444444', 'washer2@autowash.vn',
+ 3, 1, 0, 1, 9500000, 0, '2024-05-20'),
+
+-- Customer 1
+('cust123hash', 'Nguyen Minh Anh', '0911111111', 'anh@gmail.com',
+ 4, 1, 350, 1, NULL, NULL, NULL),
+
+-- Customer 2
+('cust456hash', 'Tran Hoang Long', '0922222222', 'long@gmail.com',
+ 4, 1, 1200, 2, NULL, NULL, NULL),
+
+-- Customer 3
+('cust789hash', 'Le Thi Mai', '0933333333', 'mai@gmail.com',
+ 4, 1, 2500, 3, NULL, NULL, NULL);
+
+
 
 insert into Cars (LicensePlate, UserID, Brand, Model, Color) values
 	('51A-12345', 5, 'Toyota', 'Vios', 'White'),
