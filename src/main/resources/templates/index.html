@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Car Wash System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="text-center">Hệ thống rửa xe thông minh</h1>
+    <div class="row mt-5">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Chào mừng bạn đến với dịch vụ của chúng tôi</h5>
+                    <p class="card-text">Đặt lịch rửa xe nhanh chóng, thanh toán online qua VietQR, theo dõi trạng thái realtime.</p>
+                    <a href="/login" class="btn btn-primary">Đăng nhập</a>
+                    <a href="/register" class="btn btn-secondary">Đăng ký</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-5" id="services-list">
+        <h3>📦 Các gói dịch vụ</h3>
+        <div class="row" id="service-cards"></div>
+    </div>
+</div>
+
+<script>
+    // Lấy danh sách gói dịch vụ public
+    fetch('/api/public/services')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('service-cards');
+            container.innerHTML = '';
+            data.forEach(svc => {
+                container.innerHTML += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${svc.name}</h5>
+                                <p class="card-text">${svc.description || ''}</p>
+                                <p class="card-text"><strong> ${svc.basePrice.toLocaleString()} VND</strong></p>
+                                <p>️ ${svc.estimatedMinutes} phút</p>
+                                <p> Loại xe: ${svc.vehicleType}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        });
+</script>
+</body>
+</html>
