@@ -1,0 +1,58 @@
+:root {
+  --gold: #c8a253;
+  --gold-light: #e3c885;
+  --font-display: 'Playfair Display', serif; /* thay Tenor Sans — hỗ trợ tiếng Việt */
+  --font-body: 'Manrope', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #0f0e0c;
+  color: #f4f1ea;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.82); } }
+@keyframes scanline { 0% { top: 6%; } 50% { top: 90%; } 100% { top: 6%; } }
+
+::selection { background: var(--gold); color: #0f0e0c; }
+input, button, select, textarea { font-family: inherit; outline: none; }
+input::placeholder, textarea::placeholder { color: #6b665c; }
+a { color: inherit; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0f0e0c; }
+::-webkit-scrollbar-thumb { background: #2a261f; border-radius: 8px; }
+
+/* ---- hover/focus utilities (thay cho style-hover / style-focus của thiết kế) ---- */
+.hov-text:hover { color: #f4f1ea !important; }
+.hov-gold:hover { color: var(--gold) !important; }
+.hov-bright:hover { filter: brightness(1.07); }
+.hov-bright-strong:hover { filter: brightness(1.06); }
+.hov-border-gold:hover { border-color: var(--gold) !important; }
+.hov-border-gold-soft:hover { border-color: rgba(200,162,83,0.55) !important; }
+.hov-danger:hover { color: #e08a6a !important; }
+.hov-danger-bg:hover { background: rgba(224,138,106,0.1) !important; }
+.hov-white-bg:hover { background: rgba(255,255,255,0.12) !important; }
+.hov-row:hover { background: rgba(255,255,255,0.03); }
+.foc-gold:focus { border-color: var(--gold) !important; }
+.foc-gold:focus-within { border-color: var(--gold) !important; }
+
+/* ---- responsive ---- */
+@media (max-width: 1000px) {
+  .nav-links { display: none !important; }
+  .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr !important; }
+  .dash-grid { grid-template-columns: 1fr !important; }
+  .dash-aside { display: none !important; }
+  .two-col { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 560px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .hero-stats { gap: 28px !important; }
+}
