@@ -90,6 +90,7 @@ public class WashBayServiceImpl implements WashBayService {
                     assignment.setStatus("COMPLETED");
                     assignmentRepository.save(assignment);
                 });
+
     }
 
     private WashBayResponse toResponse(WashBay bay) {

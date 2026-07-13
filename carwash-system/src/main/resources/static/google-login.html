@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+
+<body>
+
+<div id="g_id_onload"
+     data-client_id="113961981076-sdd3hoa1su780ipt519vb6cagpbaemfc.apps.googleusercontent.com"
+     data-callback="handleCredentialResponse">
+</div>
+
+<div class="g_id_signin"
+     data-type="standard"
+     data-theme="outline"
+     data-size="large">
+</div>
+<script>
+
+    function handleCredentialResponse(response) {
+
+        console.log(response.credential);
+
+        alert(response.credential);
+
+    }
+
+</script>
+
+</body>
+</html>

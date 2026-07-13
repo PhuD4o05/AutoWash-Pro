@@ -4,6 +4,9 @@ import com.carwash.carwashsystem.enums.MembershipTier;
 import com.carwash.carwashsystem.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
+import com.carwash.carwashsystem.enums.AuthProvider;
+
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -25,11 +28,23 @@ public class Customer {
     private String password;
     private String avatarUrl;
 
-    @Enumerated(EnumType.STRING)
-    private MembershipTier membershipTier;
 
-    private Integer totalPoints;
-    private Integer currentPoints;
+    //@Enumerated(EnumType.STRING)
+   // private MembershipTier membershipTier;
+
+//    private Integer totalPoints;
+//    private Integer currentPoints;
+@Builder.Default
+private Integer totalPoints = 0;
+
+
+    @Builder.Default
+    private Integer currentPoints = 0;
+
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    private MembershipTier membershipTier = MembershipTier.MEMBER;
     private Boolean isActive;
 
     @Enumerated(EnumType.STRING)
@@ -57,4 +72,14 @@ public class Customer {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    @Enumerated(EnumType.STRING)
+    private AuthProvider authProvider;
+
+    @OneToOne
+    @JoinColumn(name="account_id")
+    private Account account;
+
+
+
 }

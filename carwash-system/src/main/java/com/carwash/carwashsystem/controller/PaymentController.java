@@ -2,7 +2,10 @@ package com.carwash.carwashsystem.controller;
 
 import com.carwash.carwashsystem.dto.request.PaymentRequest;
 import com.carwash.carwashsystem.dto.response.PaymentResponse;
+import com.carwash.carwashsystem.service.interfaces.AsyncService;      // ✅ Import
 import com.carwash.carwashsystem.service.interfaces.PaymentService;
+import com.fasterxml.jackson.databind.JsonNode;                         // ✅ Import
+import com.fasterxml.jackson.databind.ObjectMapper;                    // ✅ Import
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final AsyncService asyncService;                    // Inject AsyncService
+    private final ObjectMapper objectMapper = new ObjectMapper(); // Để parse JSON
 
     @PostMapping("/{bookingId}")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'RECEPTIONIST')")
@@ -26,16 +31,34 @@ public class PaymentController {
                                                           @Valid @RequestBody PaymentRequest request) {
         return ResponseEntity.ok(paymentService.processPayment(bookingId, request));
     }
-    // Webhook endpoint cho PayOS thông báo kết quả thanh toán
+
+    //  Sửa webhook để gọi async
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(@RequestBody String body) {
         try {
-            paymentService.handlePaymentWebhook(body);
+            // 1. Parse dữ liệu từ PayOS
+            JsonNode json = objectMapper.readTree(body);
+            Long bookingId = json.get("data").get("orderCode").asLong();
+            String transactionId = json.get("data").get("transactionId").asText();
+
+            log.info(" Nhận webhook từ PayOS: bookingId={}, transactionId={}", bookingId, transactionId);
+
+            // 2. Gọi async xử lý (không đợi)
+            asyncService.processPaymentSuccessAsync(bookingId, transactionId);
+
+            // 3. Trả về OK ngay cho PayOS
             return ResponseEntity.ok("OK");
         } catch (Exception e) {
-            log.error("Webhook error", e);
+            log.error("Lỗi webhook: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Invalid webhook");
         }
     }
+    @GetMapping("/{bookingId}")
+    public ResponseEntity<PaymentResponse> getPayment(
+            @PathVariable Long bookingId){
 
+        return ResponseEntity.ok(
+                paymentService.getPaymentByBooking(bookingId)
+        );
+    }
 }

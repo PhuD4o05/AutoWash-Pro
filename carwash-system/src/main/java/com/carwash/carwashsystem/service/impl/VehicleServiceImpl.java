@@ -1,4 +1,5 @@
 package com.carwash.carwashsystem.service.impl;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.carwash.carwashsystem.dto.request.VehicleRequest;
 import com.carwash.carwashsystem.dto.response.VehicleResponse;
 import com.carwash.carwashsystem.entity.Customer;
@@ -57,6 +58,16 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse updateVehicle(Long vehicleId, VehicleRequest request) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
+
+        // Nếu đổi biển số: kiểm tra biển mới có bị xe khác dùng chưa
+        String newPlate = request.getLicensePlate();
+        if (newPlate != null && !newPlate.equals(vehicle.getLicensePlate())) {
+            if (vehicleRepository.existsByLicensePlate(newPlate)) {
+                throw new DuplicateResourceException("License plate already exists");
+            }
+            vehicle.setLicensePlate(newPlate);
+        }
+
         vehicle.setBrand(request.getBrand());
         vehicle.setModel(request.getModel());
         vehicle.setColor(request.getColor());
@@ -70,7 +81,12 @@ public class VehicleServiceImpl implements VehicleService {
         if (!vehicleRepository.existsById(vehicleId)) {
             throw new ResourceNotFoundException("Vehicle not found");
         }
-        vehicleRepository.deleteById(vehicleId);
+        try {
+            vehicleRepository.deleteById(vehicleId);
+            vehicleRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException("Xe đang có lịch sử đặt lịch, không thể xoá.");
+        }
     }
 
     @Override

@@ -43,7 +43,9 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerResponse getCustomerByPhone(String phone) {
-        return null;
+        Customer c = customerRepository.findByPhoneNumber(phone)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách với SĐT " + phone));
+        return mapToResponse(c);
     }
 
     @Override
@@ -94,8 +96,58 @@ public class CustomerServiceImpl implements CustomerService {
                 .fullName(customer.getFullName())
                 .email(customer.getEmail())
                 .phoneNumber(customer.getPhoneNumber())
+                .avatarUrl(customer.getAvatarUrl())
                 .membershipTier(customer.getMembershipTier())
                 .totalPoints(customer.getTotalPoints())
+                .currentPoints(customer.getCurrentPoints())
+                .isActive(customer.getIsActive())
+                .role(customer.getRole())
                 .build();
+    }
+
+    @Override
+    public java.util.List<CustomerResponse> getCustomerAccounts() {
+        return customerRepository.findAll().stream()
+                .filter(c -> c.getRole() == com.carwash.carwashsystem.enums.Role.CUSTOMER)
+                .map(this::mapToResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CustomerResponse createCustomerByStaff(String fullName, String phone, String password) {
+        if (customerRepository.findByPhoneNumber(phone).isPresent())
+            throw new com.carwash.carwashsystem.exception.DuplicateResourceException("SĐT đã tồn tại");
+        Customer c = Customer.builder()
+                .fullName(fullName)
+                .phoneNumber(phone)
+                .password(passwordEncoder.encode(password))
+                .role(com.carwash.carwashsystem.enums.Role.CUSTOMER)
+                .membershipTier(com.carwash.carwashsystem.enums.MembershipTier.MEMBER)
+                .totalPoints(0).currentPoints(0)
+                .isActive(true)
+                .build();
+        return mapToResponse(customerRepository.save(c));
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(Long id, String newPassword) {
+        Customer c = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + id));
+        c.setPassword(passwordEncoder.encode(newPassword));
+        customerRepository.save(c);
+    }
+
+    @Override
+    @Transactional
+    public CustomerResponse updateUserByAdmin(Long id, String fullName, String phone, String email, String role) {
+        Customer c = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+        if (fullName != null) c.setFullName(fullName);
+        if (phone != null) c.setPhoneNumber(phone);
+        if (email != null) c.setEmail(email);
+        if (role != null && !role.isBlank()) c.setRole(com.carwash.carwashsystem.enums.Role.valueOf(role.toUpperCase()));
+        return mapToResponse(customerRepository.save(c));
     }
 }

@@ -3,7 +3,6 @@ package com.carwash.carwashsystem.controller;
 import com.carwash.carwashsystem.dto.request.BookingRequest;
 import com.carwash.carwashsystem.dto.response.BookingResponse;
 import com.carwash.carwashsystem.service.interfaces.BookingService;
-import com.carwash.carwashsystem.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -48,5 +47,13 @@ public class BookingController {
     @PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
     public ResponseEntity<List<BookingResponse>> getTodayBookings() {
         return ResponseEntity.ok(bookingService.getTodayBookings());
+    }
+    @PostMapping("/{bookingId}/start")
+    public ResponseEntity<BookingResponse> startWash(
+            @PathVariable Long bookingId) {
+
+        return ResponseEntity.ok(
+                bookingService.startWash(bookingId)
+        );
     }
 }

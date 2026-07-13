@@ -19,4 +19,5 @@ public class CustomerResponse {
     private Integer totalPoints;
     private Integer currentPoints;
     private Boolean isActive;
+    private com.carwash.carwashsystem.enums.Role role;
 }

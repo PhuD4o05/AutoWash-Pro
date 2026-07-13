@@ -29,5 +29,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByStatusAndCompletedTimeBetween(BookingStatus status, LocalDateTime start, LocalDateTime end);
     List<Booking> findByStatusInAndScheduledTimeBefore(List<BookingStatus> statuses, LocalDateTime time);
     List<Booking> findByCustomer(Customer customer);
-
+    List<Booking> findByStatusIn(List<BookingStatus> statuses);
 }

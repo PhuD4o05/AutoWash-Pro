@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/receptionist")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('RECEPTIONIST')")
+@PreAuthorize("hasAnyRole('RECEPTIONIST', 'ADMIN')")
 @Tag(name = "Receptionist Controller", description = "Nghiệp vụ tiếp tân")
 public class ReceptionistController {
 

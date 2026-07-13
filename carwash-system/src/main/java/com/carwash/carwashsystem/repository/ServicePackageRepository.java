@@ -16,4 +16,5 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackage, 
     @Query("SELECT DISTINCT sp.vehicleType FROM ServicePackage sp")
     List<String> findDistinctVehicleTypes();
     List<ServicePackage> findByIsActiveTrueOrderByBasePriceAsc();
+
 }

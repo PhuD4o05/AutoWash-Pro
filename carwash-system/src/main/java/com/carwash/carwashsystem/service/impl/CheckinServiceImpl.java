@@ -56,12 +56,17 @@ public class CheckinServiceImpl implements CheckinService {
 
         return CheckinInfoResponse.builder()
                 .bookingId(booking.getId())
-                .customerId(booking.getId())
-                .vehicleId(booking.getId())
-                .servicePackageId(booking.getId())
+                .customerName(booking.getCustomer().getFullName())
+                .phoneNumber(booking.getCustomer().getPhoneNumber())
+                .vehicle(booking.getVehicle().getLicensePlate()) // giả sử có
+                .servicePackage(booking.getServicePackage().getName())
+                .totalPrice(Double.valueOf(booking.getServicePackage().getBasePrice()))
                 .scheduledTime(booking.getScheduledTime())
+                .checkinTime(booking.getCheckinTime()) // đã được set
                 .status(booking.getStatus())
-                .queuePosition(queueService.getQueuePosition(booking.getId()).getPosition())
+                .queuePosition(queueService.getQueuePosition(booking.getId()).getQueuePosition()) // nếu trả về Integer
+                .message("Check-in thành công")
+                .bayNumber(null)
                 .build();
     }
 
@@ -95,12 +100,18 @@ public class CheckinServiceImpl implements CheckinService {
 
         return CheckinInfoResponse.builder()
                 .bookingId(booking.getId())
-                .customerId(customer.getId())
-                .vehicleId(booking.getId())
-                .servicePackageId(booking.getId())
+                .customerName(customer.getFullName())           // String, không phải Long
+                .phoneNumber(customer.getPhoneNumber())         // thêm số điện thoại nếu cần
+                .vehicle(booking.getVehicle().getLicensePlate()) // hoặc getModel()
+                .servicePackage(booking.getServicePackage().getName())
+                .totalPrice(Double.valueOf(booking.getServicePackage().getBasePrice()))
                 .scheduledTime(booking.getScheduledTime())
+                .checkinTime(booking.getCheckinTime())
                 .status(booking.getStatus())
-                .queuePosition(queueService.getQueuePosition(booking.getId()).getPosition())
+                .queuePosition(queueService.getQueuePosition(booking.getId()).getQueuePosition()) // nếu trả về Integer
+                // hoặc queueService.getQueuePosition(booking.getId()).getQueuePosition() nếu trả về object có method đó
+                .message("Check-in thành công")
+                .bayNumber(null)
                 .build();
     }
 }

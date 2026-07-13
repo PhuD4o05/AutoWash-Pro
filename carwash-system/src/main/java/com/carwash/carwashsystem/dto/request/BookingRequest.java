@@ -21,4 +21,5 @@ public class BookingRequest {
     @NotNull
     @Future
     private LocalDateTime scheduledTime;
+    private String voucherCode;
 }

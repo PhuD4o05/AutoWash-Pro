@@ -12,4 +12,7 @@ public interface AssignmentService {
     WashAssignmentResponse assignWasherToBooking(Long bookingId, Long washerId);
     List<WashAssignmentResponse> getAssignmentsByWasher(Long washerId, String date);
     void autoAssignWashersForShift(String date, String shiftType);
+    void autoAssignWasher(Long bookingId);
+
+
 }

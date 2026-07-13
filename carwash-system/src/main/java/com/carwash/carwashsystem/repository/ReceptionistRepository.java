@@ -9,4 +9,5 @@ public interface ReceptionistRepository extends JpaRepository<Receptionist, Long
     // Thêm hoặc sửa thành:
     Optional<Receptionist> findByPhoneNumber(String phoneNumber);
     boolean existsByPhoneNumber(String phoneNumber);
+    Optional<Receptionist> findByEmail(String email);
 }

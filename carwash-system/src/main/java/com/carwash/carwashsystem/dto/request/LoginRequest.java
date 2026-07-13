@@ -1,5 +1,6 @@
 package com.carwash.carwashsystem.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -13,8 +14,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class LoginRequest {
     @NotBlank
-    @Email
-    private String email;
+    @JsonProperty("identifier")
+    private String username;
     @NotBlank
     private String password;
 }

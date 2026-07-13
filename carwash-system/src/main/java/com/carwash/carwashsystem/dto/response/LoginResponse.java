@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class LoginResponse {
     private String accessToken;
     private String refreshToken;
+    private String role;        // "ADMIN", "CUSTOMER", "RECEPTIONIST"
+    private String fullName;    // Tên hiển thị
 }

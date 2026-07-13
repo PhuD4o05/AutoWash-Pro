@@ -25,4 +25,9 @@ public interface CustomerService {
     List<CustomerResponse> getAllCustomers();
 
     Customer getCustomerEntityById(Long id);
+
+    java.util.List<CustomerResponse> getCustomerAccounts();
+    CustomerResponse createCustomerByStaff(String fullName, String phone, String password);
+    void resetPassword(Long id, String newPassword);
+    CustomerResponse updateUserByAdmin(Long id, String fullName, String phone, String email, String role);
 }

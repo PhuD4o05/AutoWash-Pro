@@ -1,5 +1,6 @@
 package com.carwash.carwashsystem.controller;
 
+import com.carwash.carwashsystem.dto.request.GoogleLoginRequest;
 import com.carwash.carwashsystem.dto.request.LoginRequest;
 import com.carwash.carwashsystem.dto.request.RegisterRequest;
 import com.carwash.carwashsystem.dto.response.LoginResponse;
@@ -36,5 +37,13 @@ public class AuthController {
     @Operation(summary = "Làm mới access token")
     public ResponseEntity<LoginResponse> refresh(@RequestParam String refreshToken) {
         return ResponseEntity.ok(authService.refreshToken(refreshToken));
+    }
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponse> loginGoogle(
+            @RequestBody GoogleLoginRequest request){
+
+        return ResponseEntity.ok(
+                authService.loginWithGoogle(request)
+        );
     }
 }

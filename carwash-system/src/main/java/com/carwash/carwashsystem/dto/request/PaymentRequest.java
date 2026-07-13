@@ -10,4 +10,8 @@ public class PaymentRequest {
     private Long amount;
     @NotNull
     private PaymentMethod paymentMethod;
+    private PaymentMethod method;
+
+
+
 }

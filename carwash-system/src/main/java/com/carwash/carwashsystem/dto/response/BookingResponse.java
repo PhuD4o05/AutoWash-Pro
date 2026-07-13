@@ -21,4 +21,24 @@ public class BookingResponse {
     private BookingStatus status;
     private Double totalPrice;
     private String qrCode;
+
+    private String packageName;
+    private String licensePlate;
+    private String carBrand;
+    private String carModel;
+    private String customerName;
+    private String note;
+    private String bayNumber;
+    private Boolean paid;
+
+    private Long depositAmount;
+
+    private Long remainingAmount;
+
+
+    private Boolean deposited;
+
+
+
+    private Long remainAmount;
 }

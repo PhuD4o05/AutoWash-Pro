@@ -1,5 +1,6 @@
 package com.carwash.carwashsystem.security;
 
+import com.carwash.carwashsystem.entity.Customer;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -47,6 +48,8 @@ public class JwtTokenProvider {
                 .signWith(key(), Jwts.SIG.HS512)  // Jwts.SIG.HS512 thay cho SignatureAlgorithm.HS512
                 .compact();
     }
+
+
 
     public String generateRefreshToken(Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
@@ -100,5 +103,46 @@ public class JwtTokenProvider {
             log.error("JWT claims string is empty");
         }
         return false;
+    }
+//    public String generateAccessToken(Customer customer) {
+//        Date now = new Date();
+//        Date expiryDate = new Date(now.getTime() + jwtExpiration);
+//
+//        return Jwts.builder()
+//                .subject(String.valueOf(customer.getId()))
+//                .claim("username", customer.getPhoneNumber())
+//                .claim("role", customer.getRole().name())
+//                .issuedAt(now)
+//                .expiration(expiryDate)
+//                .signWith(key(), Jwts.SIG.HS512)
+//                .compact();
+//    }
+
+
+    public String generateAccessToken(Customer customer) {
+
+        Date now = new Date();
+        Date expiryDate =
+                new Date(now.getTime() + jwtExpiration);
+
+        return Jwts.builder()
+                .subject(String.valueOf(customer.getId()))
+                .claim("username", customer.getPhoneNumber())
+                .claim("role", "ROLE_" + customer.getRole().name())
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key(), Jwts.SIG.HS512)
+                .compact();
+    }
+    public String generateRefreshToken(Customer customer) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshExpiration);
+
+        return Jwts.builder()
+                .subject(String.valueOf(customer.getId()))
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key(), Jwts.SIG.HS512)
+                .compact();
     }
 }

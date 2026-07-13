@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/CarWashManagementSystem.iml" filepath="$PROJECT_DIR$/.idea/CarWashManagementSystem.iml" />
-      <module fileurl="file://$PROJECT_DIR$/carwash-system/carwash-system.iml" filepath="$PROJECT_DIR$/carwash-system/carwash-system.iml" />
     </modules>
   </component>
 </project>

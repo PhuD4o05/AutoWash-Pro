@@ -53,12 +53,17 @@ public class ReceptionistServiceImpl implements ReceptionistService {
         queueService.addToQueue(booking.getId());
         return CheckinInfoResponse.builder()
                 .bookingId(booking.getId())
-                .customerId(booking.getId())
-                .vehicleId(booking.getId())
-                .servicePackageId(booking.getId())
+                .customerName(booking.getCustomer().getFullName())
+                .phoneNumber(booking.getCustomer().getPhoneNumber())
+                .vehicle(booking.getVehicle().getLicensePlate()) // giả sử có
+                .servicePackage(booking.getServicePackage().getName())
+                .totalPrice(Double.valueOf(booking.getServicePackage().getBasePrice()))
                 .scheduledTime(booking.getScheduledTime())
+                .checkinTime(booking.getCheckinTime()) // đã được set
                 .status(booking.getStatus())
-                .queuePosition(queueService.getQueuePosition(booking.getId()).getPosition())
+                .queuePosition(queueService.getQueuePosition(booking.getId()).getQueuePosition()) // nếu trả về Integer
+                .message("Check-in thành công")
+                .bayNumber(null)
                 .build();
     }
 
@@ -98,6 +103,10 @@ public class ReceptionistServiceImpl implements ReceptionistService {
                     Customer newCustomer = Customer.builder()
                             .phoneNumber(request.getPhone())
                             .fullName(request.getFullName() != null ? request.getFullName() : "Walk-in Customer")
+                            .role(com.carwash.carwashsystem.enums.Role.CUSTOMER)
+                            .membershipTier(com.carwash.carwashsystem.enums.MembershipTier.MEMBER)
+                            .totalPoints(0)
+                            .currentPoints(0)
                             .isActive(true)
                             .build();
                     return customerRepository.save(newCustomer);
@@ -127,15 +136,19 @@ public class ReceptionistServiceImpl implements ReceptionistService {
         queueService.addToQueue(booking.getId());
         return CheckinInfoResponse.builder()
                 .bookingId(booking.getId())
-                .customerId(customer.getId())
-                .vehicleId(vehicle.getId())
-                .servicePackageId(request.getPackageId())
+                .customerName(booking.getCustomer().getFullName())
+                .phoneNumber(booking.getCustomer().getPhoneNumber())
+                .vehicle(booking.getVehicle().getLicensePlate()) // giả sử có
+                .servicePackage(booking.getServicePackage().getName())
+                .totalPrice(Double.valueOf(booking.getServicePackage().getBasePrice()))
                 .scheduledTime(booking.getScheduledTime())
+                .checkinTime(booking.getCheckinTime()) // đã được set
                 .status(booking.getStatus())
-                .queuePosition(queueService.getQueuePosition(booking.getId()).getPosition())
+                .queuePosition(queueService.getQueuePosition(booking.getId()).getQueuePosition()) // nếu trả về Integer
+                .message("Check-in thành công")
+                .bayNumber(null)
                 .build();
     }
-
     @Override
     public List<Booking> getTodayBookings() {
         LocalDateTime start = LocalDate.now().atStartOfDay();
@@ -147,10 +160,8 @@ public class ReceptionistServiceImpl implements ReceptionistService {
     public List<WashQueue> getCurrentQueue() {
         return washQueueRepository.findByStatusInOrderByQueuePositionAsc(
                 List.of(
-                        BookingStatus.CHECKED_IN,
-                        BookingStatus.COMPLETED,
-                        BookingStatus.CANCELLED
-
+                        BookingStatus.WAITING,
+                        BookingStatus.WASHING
                 )
         );
     }
