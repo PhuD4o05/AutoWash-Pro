@@ -3,10 +3,11 @@ package com.carwash.carwashsystem.service.impl;
 
 import com.carwash.carwashsystem.dto.request.ExtraServiceRequest;
 import com.carwash.carwashsystem.dto.response.BookingResponse;
-import com.carwash.carwashsystem.entity.*;
+import com.carwash.carwashsystem.entity.Booking;
+import com.carwash.carwashsystem.entity.BookingExtraService;
 import com.carwash.carwashsystem.exception.ResourceNotFoundException;
-import com.carwash.carwashsystem.repository.BookingRepository;
 import com.carwash.carwashsystem.repository.BookingExtraServiceRepository;
+import com.carwash.carwashsystem.repository.BookingRepository;
 import com.carwash.carwashsystem.service.interfaces.ReceptionService;
 
 import lombok.RequiredArgsConstructor;
@@ -30,17 +31,20 @@ public class ReceptionServiceImpl implements ReceptionService {
     public BookingResponse addExtraService(
             Long bookingId,
             ExtraServiceRequest request
-    ){
+    ) {
 
 
         Booking booking =
                 bookingRepository.findById(bookingId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "Booking not found"));
+                                        "Booking not found"
+                                )
+                        );
 
 
 
+        // Tạo dịch vụ phát sinh
         BookingExtraService extra =
                 BookingExtraService.builder()
                         .booking(booking)
@@ -50,27 +54,62 @@ public class ReceptionServiceImpl implements ReceptionService {
 
 
 
+        // lưu bảng booking_extra_services
         extraRepository.save(extra);
 
 
 
-        Double current =
-                booking.getTotalPrice() == null
-                        ? 0
-                        : booking.getTotalPrice();
+        // cập nhật list trong Booking
+        booking.getExtraServices().add(extra);
 
 
 
-        booking.setTotalPrice(
-                current + request.getPrice()
+        // lấy tổng tiền hiện tại
+        long currentFinalAmount =
+                booking.getFinalAmount() == null
+                        ?
+                        booking.getTotalPrice().longValue()
+                        :
+                        booking.getFinalAmount();
+
+
+
+        // cộng thêm dịch vụ
+        long newFinalAmount =
+                currentFinalAmount + request.getPrice();
+
+
+
+        booking.setFinalAmount(newFinalAmount);
+
+
+
+        // tính tiền còn lại
+        long deposit =
+                booking.getDepositAmount() == null
+                        ?
+                        0L
+                        :
+                        booking.getDepositAmount();
+
+
+
+        booking.setRemainingAmount(
+                newFinalAmount - deposit
         );
 
 
-        bookingRepository.save(booking);
+
+        Booking saved =
+                bookingRepository.save(booking);
 
 
 
-        return null;
+        return BookingResponse.builder()
+                .id(saved.getId())
+                .totalPrice(saved.getTotalPrice())
+                .status(saved.getStatus())
+                .build();
     }
 
 }

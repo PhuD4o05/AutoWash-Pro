@@ -1,5 +1,6 @@
 package com.carwash.carwashsystem.controller;
 
+import com.carwash.carwashsystem.dto.request.ExtraServiceRequest;
 import com.carwash.carwashsystem.dto.request.WalkinBookingRequest;
 import com.carwash.carwashsystem.dto.response.CheckinInfoResponse;
 import com.carwash.carwashsystem.entity.Booking;
@@ -52,5 +53,18 @@ public class ReceptionistController {
     public ResponseEntity<Void> confirmPayment(@PathVariable Long bookingId, @RequestParam String paymentMethod) {
         receptionistService.confirmPayment(bookingId, paymentMethod);
         return ResponseEntity.ok().build();
+    }
+    @PostMapping("/{bookingId}/extra-service")
+    public ResponseEntity<Booking> addExtraService(
+            @PathVariable Long bookingId,
+            @RequestBody ExtraServiceRequest request
+    ){
+
+        return ResponseEntity.ok(
+                receptionistService.addExtraService(
+                        bookingId,
+                        request
+                )
+        );
     }
 }

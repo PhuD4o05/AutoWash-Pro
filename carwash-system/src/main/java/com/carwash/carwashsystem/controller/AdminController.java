@@ -153,12 +153,12 @@ public class AdminController {
         return ResponseEntity.ok(adminService.updateWashBayStatus(bayId, status));
     }
 
-    // Danh sách tất cả tài khoản (trong bảng customers, mọi role)
-    @GetMapping("/users")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<com.carwash.carwashsystem.dto.response.CustomerResponse>> getAllUsers() {
-        return ResponseEntity.ok(customerService.getAllCustomers());
-    }
+//    // Danh sách tất cả tài khoản (trong bảng customers, mọi role)
+//    @GetMapping("/users")
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<List<com.carwash.carwashsystem.dto.response.CustomerResponse>> getAllUsers() {
+//        return ResponseEntity.ok(customerService.getAllCustomers());
+//    }
 
     // Tất cả booking trong hệ thống
     @GetMapping("/bookings")

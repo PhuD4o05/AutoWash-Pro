@@ -42,6 +42,7 @@ public class BookingServiceImpl implements BookingService {
     private final WashBayService washBayService;
     private final AssignmentService assignmentService;
     private final LoyaltyService loyaltyService;
+    private final PaymentService paymentService;
 
 
 
@@ -71,7 +72,8 @@ public class BookingServiceImpl implements BookingService {
             }
 
             // 5. Tính giá (có bắt lỗi)
-            Double finalPrice;
+            Long finalPrice;
+
             try {
                 finalPrice = pricingService.calculateFinalPrice(
                         request.getPackageId(),
@@ -81,11 +83,8 @@ public class BookingServiceImpl implements BookingService {
                                 : "MEMBER",
                         request.getVoucherCode()
                 );
-                System.out.println(">>> PricingService returned: " + finalPrice);
             } catch (Exception e) {
-                System.err.println(" ERROR in PricingService: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("Pricing calculation failed: " + e.getMessage(), e);
+                throw new RuntimeException("Cannot calculate booking price", e);
             }
 
             // 6. Tạo QR code (có bắt lỗi)
@@ -106,7 +105,7 @@ public class BookingServiceImpl implements BookingService {
                     .servicePackage(servicePackage)
                     .scheduledTime(request.getScheduledTime())
                     .status(BookingStatus.PENDING)
-                    .totalPrice(finalPrice != null ? finalPrice : 0.0)
+                    .totalPrice(finalPrice != null ? finalPrice.longValue() : 0L)
                     .voucherCode(request.getVoucherCode())
                     .qrCode(qrCode)
                     .build();
@@ -128,49 +127,59 @@ public class BookingServiceImpl implements BookingService {
 
             saved.setDepositAmount(deposit);
 
+            saved.setFinalAmount(saved.getTotalPrice());
+
+            saved.setRemainingAmount(
+                    saved.getTotalPrice() - deposit
+            );
+
             saved.setDeposited(false);
 
             saved = bookingRepository.save(saved);
 
-            Payment payment = Payment.builder()
-
-                    .booking(saved)
-
-                    .amount(deposit)
-
-                    .paymentType(PaymentType.DEPOSIT)
-
-                    .status(PaymentStatus.PENDING)
-
-                    .method(PaymentMethod.PAYOS)
-
-                    .build();
-
-            paymentRepository.save(payment);
-
-            // sinh ảnh QR
-            byte[] qrImage =
-                    qrCodeService.generateQRCodeImage(qrToken);
-
-            // gửi email
-            emailService.sendBookingConfirmation(
-                    customer.getEmail(),
-                    customer.getFullName(),
-
-                    "Booking #" + saved.getId()
-                            + "<br>Ngày rửa: "
-                            + saved.getScheduledTime()
-                            + "<br>Dịch vụ: "
-                            + saved.getServicePackage().getName()
-                            + "<br>Số tiền: "
-                            + saved.getTotalPrice()
-                            + " VNĐ",
-
-                    Base64.getEncoder()
-                            .encodeToString(qrImage)
-            );
+//            Payment payment = Payment.builder()
+//
+//                    .booking(saved)
+//
+//                    .amount(deposit)
+//
+//                    .paymentType(PaymentType.DEPOSIT)
+//
+//                    .status(PaymentStatus.PENDING)
+//
+//                    .method(PaymentMethod.PAYOS)
+//
+//                    .build();
+//
+//            paymentRepository.save(payment);
+//
+//            // sinh ảnh QR
+//            byte[] qrImage =
+//                    qrCodeService.generateQRCodeImage(qrToken);
+//
+//            // gửi email
+//            emailService.sendBookingConfirmation(
+//                    customer.getEmail(),
+//                    customer.getFullName(),
+//
+//                    "Booking #" + saved.getId()
+//                            + "<br>Ngày rửa: "
+//                            + saved.getScheduledTime()
+//                            + "<br>Dịch vụ: "
+//                            + saved.getServicePackage().getName()
+//                            + "<br>Số tiền: "
+//                            + saved.getTotalPrice()
+//                            + " VNĐ",
+//
+//                    Base64.getEncoder()
+//                            .encodeToString(qrImage)
+//            );
+            // Tạo Payment + gửi email PayOS
+            paymentService.createPaymentForBooking(saved);
 
             return mapToResponse(saved);
+
+
         } catch (Exception e) {
             System.err.println(" UNEXPECTED ERROR in createBooking: " + e.getMessage());
             e.printStackTrace();
@@ -486,6 +495,8 @@ public BookingResponse advanceBookingStatus(Long bookingId) {
                 .totalPrice(booking.getTotalPrice())
                 .depositAmount(booking.getDepositAmount())
                 .deposited(booking.getDeposited())
+                .finalAmount(booking.getFinalAmount())
+                .remainingAmount(booking.getRemainingAmount())
                 .qrCode(booking.getQrCode())
                 .packageName(booking.getServicePackage() != null ? booking.getServicePackage().getName() : null)
                 .licensePlate(booking.getVehicle() != null ? booking.getVehicle().getLicensePlate() : null)

@@ -9,6 +9,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Base64;
 
 @Service
@@ -321,54 +322,149 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+
+
     @Override
-    public void sendBookingDepositEmail(
-            String email,
-            String customerName,
-            Long bookingId,
-            Double totalAmount,
-            Double depositAmount,
-            //String depositQrBase64
-            String paymentUrl
-    ) {
+    public void sendBookingDepositEmail(String email, String customerName, Long bookingId, LocalDateTime scheduledTime, String packageName, Double totalAmount, Double depositAmount, byte[] checkinQr, byte[] payosQr, String paymentUrl) {
 
-        String subject = "Xác nhận đặt lịch rửa xe - Booking #" + bookingId;
+        try {
+            System.out.println("========== SEND BOOKING EMAIL ==========");
+            System.out.println("To: " + email);
+            System.out.println("Booking: " + bookingId);
+
+            MimeMessage message = mailSender.createMimeMessage();
+
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromEmail);
+            helper.setTo(email);
+            helper.setSubject("Xác nhận đặt lịch - Booking #" + bookingId);
+
+            String html =
+                    """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                    </head>
+                    <body style="font-family:Arial,sans-serif">
+    
+                    <h2>Xin chào %s</h2>
+    
+                    <p>Cảm ơn bạn đã đặt lịch tại <b>CarWash System</b>.</p>
+    
+                    <h3>Chi tiết booking</h3>
+    
+                    <table border="1"
+                           cellpadding="8"
+                           cellspacing="0"
+                           style="border-collapse:collapse">
+    
+                        <tr>
+                            <td><b>Booking</b></td>
+                            <td>#%d</td>
+                        </tr>
+    
+                        <tr>
+                            <td><b>Ngày rửa</b></td>
+                            <td>%s</td>
+                        </tr>
+    
+                        <tr>
+                            <td><b>Dịch vụ</b></td>
+                            <td>%s</td>
+                        </tr>
+    
+                        <tr>
+                            <td><b>Tổng tiền</b></td>
+                            <td>%,.0f VNĐ</td>
+                        </tr>
+    
+                        <tr>
+                            <td><b>Tiền cọc</b></td>
+                            <td>%,.0f VNĐ</td>
+                        </tr>
+    
+                    </table>
+    
+                    <br>
+    
+                    <h3>1. QR Check-in</h3>
+    
+                    <p>Vui lòng xuất trình QR này khi đến cửa hàng.</p>
+    
+                    <img src="cid:checkinQr" width="220"/>
+    
+                    <br><br>
+    
+                    <h3>2. QR Thanh toán PayOS</h3>
+    
+                    <img src="cid:payosQr" width="220"/>
+    
+                    <br><br>
+    
+                    <p>Hoặc bấm nút bên dưới:</p>
+    
+                    <a href="%s"
+                       style="
+                            background:#0d6efd;
+                            color:white;
+                            padding:12px 20px;
+                            text-decoration:none;
+                            border-radius:5px;">
+                        Thanh toán ngay
+                    </a>
+    
+                    <br><br>
+    
+                    <p>
+                    Sau khi thanh toán tiền cọc,
+                    vui lòng đến cửa hàng và quét QR Check-in.
+                    </p>
+    
+                    <p>Xin cảm ơn!</p>
+    
+                    </body>
+                    </html>
+                    """.formatted(
+                            customerName,
+                            bookingId,
+                            scheduledTime,
+                            packageName,
+                            totalAmount,
+                            depositAmount,
+                            payosQr,
+                            paymentUrl
+                    );
+
+            helper.setText(html, true);
+
+            helper.addInline(
+                    "checkinQr",
+                    new ByteArrayResource(checkinQr),
+                    "image/png"
 
 
-        String content =
-                "<h2>Xin chào " + customerName + "</h2>" +
 
-                        "<p>Cảm ơn bạn đã đặt lịch tại CarWash System.</p>" +
+            );
+            helper.addInline(
+                    "payosQr",
+                    new ByteArrayResource(payosQr),
+                    "image/png"
+            );
 
-                        "<p><b>Booking:</b> #" + bookingId + "</p>" +
+            mailSender.send(message);
 
-                        "<p><b>Tổng tiền dịch vụ:</b> "
-                        + totalAmount + " VNĐ</p>" +
+            System.out.println("Email sent successfully.");
 
-                        "<p><b>Tiền cọc cần thanh toán:</b> "
-                        + depositAmount + " VNĐ</p>" +
-
-                        "<h3>Thanh toán tiền cọc</h3>" +
-
-                        "<p>Vui lòng bấm vào link bên dưới để thanh toán:</p>" +
-
-                        "<a href='"
-                        + paymentUrl +
-                        "' target='_blank'>"
-
-                        + "Thanh toán PayOS"
-
-                        + "</a>" +
-
-                        "<p>Sau khi thanh toán cọc, vui lòng mang xe tới và quét QR check-in.</p>";
-
-
-        sendEmail(
-                email,
-                subject,
-                content
-        );
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Không gửi được email booking", e);
+        }
     }
+
+
     private void sendEmail(
             String toEmail,
             String subject,
@@ -395,11 +491,8 @@ public class EmailServiceImpl implements EmailService {
             mailSender.send(message);
 
         } catch (Exception e) {
-
-            throw new RuntimeException(
-                    "Không thể gửi email: " + e.getMessage(),
-                    e
-            );
+            e.printStackTrace();
+            throw new RuntimeException("Không gửi được email booking", e);
         }
     }
 

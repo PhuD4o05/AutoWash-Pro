@@ -19,7 +19,7 @@ public class BookingResponse {
     private Long packageId;
     private LocalDateTime scheduledTime;
     private BookingStatus status;
-    private Double totalPrice;
+    private Long totalPrice;
     private String qrCode;
 
     private String packageName;
@@ -41,4 +41,8 @@ public class BookingResponse {
 
 
     private Long remainAmount;
+
+    private Long finalAmount;
+
+
 }

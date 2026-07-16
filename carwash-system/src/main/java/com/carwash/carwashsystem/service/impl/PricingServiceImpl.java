@@ -22,55 +22,34 @@ public class PricingServiceImpl implements PricingService {
 
 
     @Override
-    public Double calculateFinalPrice(
+    public Long calculateFinalPrice(
             Long servicePackageId,
             LocalDateTime scheduledTime,
             String membershipTier,
             String voucherCode
     ) {
 
-
         ServicePackage sp =
                 packageRepository.findById(servicePackageId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Service package not found"
-                                ));
+                                new RuntimeException("Service package not found"));
 
+        Long basePrice = sp.getBasePrice();
 
-
-        // Giá gốc
-
-        double basePrice =
-                sp.getBasePrice();
-
-
-
-        // Tính tổng tiền giảm
-
-        double discount =
-                discountService.calculateDiscount(
-                        basePrice,
-                        voucherCode,
-                        membershipTier
+        Long discount =
+                Math.round(
+                        discountService.calculateDiscount(
+                                basePrice.doubleValue(),
+                                voucherCode,
+                                membershipTier
+                        )
                 );
 
+        Long finalPrice = basePrice - discount;
 
-
-        // Giá sau giảm
-
-        double finalPrice =
-                basePrice - discount;
-
-
-
-        // tránh âm tiền
-
-        if(finalPrice < 0){
-            finalPrice = 0;
+        if (finalPrice < 0) {
+            finalPrice = 0L;
         }
-
-
 
         return finalPrice;
     }

@@ -15,6 +15,7 @@ import com.carwash.carwashsystem.repository.PaymentRepository;
 import com.carwash.carwashsystem.service.interfaces.EmailService;
 import com.carwash.carwashsystem.service.interfaces.LoyaltyService;
 import com.carwash.carwashsystem.service.interfaces.PaymentService;
+import com.carwash.carwashsystem.service.interfaces.QRCodeService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final EmailService emailService;
 //    private final LoyaltyService loyaltyService;
+    private final QRCodeService qrCodeService;
 
     @Override
     @Transactional
@@ -281,15 +283,37 @@ public class PaymentServiceImpl implements PaymentService {
             paymentRepository.save(payment);
 
             // Gửi email chứa QR check-in + QR thanh toán cọc
+//            emailService.sendBookingDepositEmail(
+//                    booking.getCustomer().getEmail(),
+//                    booking.getCustomer().getFullName(),
+//                    booking.getId(),
+//                    booking.getTotalPrice().doubleValue(),
+//                    depositAmount.doubleValue(),
+//                    //payosResponse.getQrCode()
+//                    payosResponse.getCheckoutUrl()
+            byte[] checkinQr =
+                    qrCodeService.generateQRCodeImage(
+                            booking.getQrCode()
+                    );
+
+            byte[] payosQr =
+                    qrCodeService.generateQRCodeImage(
+                            payosResponse.getCheckoutUrl()
+                    );
+
             emailService.sendBookingDepositEmail(
                     booking.getCustomer().getEmail(),
                     booking.getCustomer().getFullName(),
                     booking.getId(),
+                    booking.getScheduledTime(),
+                    booking.getServicePackage().getName(),
                     booking.getTotalPrice().doubleValue(),
                     depositAmount.doubleValue(),
-                    //payosResponse.getQrCode()
+                    checkinQr,
+                    payosQr,
                     payosResponse.getCheckoutUrl()
             );
+
 
             return PaymentResponse.builder()
                     .id(payment.getId())

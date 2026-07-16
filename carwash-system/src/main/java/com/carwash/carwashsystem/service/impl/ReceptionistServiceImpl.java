@@ -1,5 +1,6 @@
 package com.carwash.carwashsystem.service.impl;
 
+import com.carwash.carwashsystem.dto.request.ExtraServiceRequest;
 import com.carwash.carwashsystem.dto.request.WalkinBookingRequest;
 import com.carwash.carwashsystem.dto.response.CheckinInfoResponse;
 import com.carwash.carwashsystem.entity.Booking;
@@ -72,8 +73,10 @@ public class ReceptionistServiceImpl implements ReceptionistService {
     public CheckinInfoResponse scanQRCheckin(String qrCode) {
         Booking booking = bookingRepository.findByQrCode(qrCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid QR code"));
-        if (booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new RuntimeException("Booking not confirmed");
+        if (booking.getStatus() != BookingStatus.PENDING
+                && booking.getStatus() != BookingStatus.CONFIRMED) {
+
+            throw new RuntimeException("Booking cannot check-in");
         }
         return performCheckin(booking);
     }
@@ -180,5 +183,10 @@ public class ReceptionistServiceImpl implements ReceptionistService {
         if (booking.getStatus() == BookingStatus.COMPLETED) {
             // Điểm loyalty đã được cộng khi washer hoàn thành
         }
+    }
+
+    @Override
+    public Booking addExtraService(Long bookingId, ExtraServiceRequest request) {
+        return null;
     }
 }

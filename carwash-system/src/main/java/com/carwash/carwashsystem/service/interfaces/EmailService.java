@@ -1,5 +1,7 @@
 package com.carwash.carwashsystem.service.interfaces;
 
+import java.time.LocalDateTime;
+
 public interface EmailService {
 
     // Email sau khi booking
@@ -46,11 +48,20 @@ public interface EmailService {
     void sendDepositSuccessEmail(String email, String fullName, Long id, double v);
 
     void sendBookingDepositEmail(
+
             String email,
             String customerName,
             Long bookingId,
+            LocalDateTime scheduledTime,
+            String packageName,
             Double totalAmount,
             Double depositAmount,
-            String depositQrBase64
+            byte[] checkinQr,
+            byte[] payosQr,
+            String paymentUrl
+
     );
+
+
+
 }
