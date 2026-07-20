@@ -120,37 +120,54 @@ export default function Home({ services, packages, gallery, reviews, onOpenBooki
         </div>
       </section>
 
-      {/* ===================== CONTACT (ảnh nền) ===================== */}
-      <section id="contact" style={css('padding:90px 6vw;max-width:1400px;margin:0 auto;background:url("/img/contact.jpg") center / cover no-repeat;overflow:visible;')}>
-        <div>
-          <div style={css('font-size:11.5px;letter-spacing:3px;text-transform:uppercase;color:#ffbe37;margin-bottom:16px;')}>Liên hệ &amp; địa chỉ</div>
-          <h2 style={css('font-family:var(--font-display);font-size:clamp(28px,3.2vw,42px);margin:0 0 30px;font-weight:500;')}>Trung tâm chăm sóc xe<div>AutoWash Pro</div></h2>
-          <div style={css('display:flex;flex-direction:column;gap:22px;')}>
-            {[
-              ['⌖', 'Địa chỉ trung tâm', '12 Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh'],
-              ['☏', 'Hotline đặt lịch', '1900 6789 · 0901 234 567'],
-              ['◷', 'Giờ mở cửa', 'Thứ 2 – Chủ Nhật: 7:30 – 20:00'],
-            ].map(([icon, label, value]) => (
-              <div key={label} style={css('display:flex;gap:16px;align-items:flex-start;')}>
-                <div style={css('font-size:18px;color:var(--gold);flex-shrink:0;width:20px;line-height:1.5;')}>{icon}</div>
-                <div>
-                  <div style={css('font-size:13px;color:#8b8578;margin-bottom:3px;')}>{label}</div>
-                  <div style={css('font-size:15.5px;color:#ffffff;line-height:1.5;')}>{value}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button onClick={onOpenBooking} className="hov-bright" style={css('margin-top:36px;background:var(--gold);border:none;color:#100f0c;padding:15px 34px;border-radius:32px;font-size:15px;font-weight:600;cursor:pointer;')}>Đặt lịch ngay</button>
-        </div>
-      </section>
-
       {/* ===================== FOOTER ===================== */}
-      <footer style={css('border-top:1px solid rgba(255,255,255,0.07);padding:50px 6vw 40px;')}>
-        <div style={css('max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;')}>
-          <div style={css('display:flex;align-items:center;gap:12px;')}>
-            <span style={css('font-family:var(--font-display);font-size:18px;')}>AutoWash Pro</span>
+      <footer id="contact" style={css('border-top:1px solid rgba(255,255,255,0.08);background:#0b0a08;padding:80px 6vw 40px;')}>
+        <div style={css('max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:40px;margin-bottom:60px;')}>
+          {/* Logo and About */}
+          <div>
+            <div style={css('display:flex;align-items:center;gap:10px;margin-bottom:20px;')}>
+              <span style={css('font-family:var(--font-display);font-size:24px;color:var(--gold);font-weight:600;')}>AutoWash Pro</span>
+            </div>
+            <p style={css('font-size:14px;color:#a39e92;line-height:1.6;margin:0;')}>
+              Hệ thống chăm sóc xe hơi chuyên nghiệp chuẩn Detailing. Tỉ mỉ trong từng chi tiết, nâng tầm giá trị xế cưng của bạn.
+            </p>
           </div>
-          <div style={css('font-size:13.5px;color:#8b8578;')}>© 2026 AutoWash Pro · Detailing &amp; Chăm sóc xe cao cấp</div>
+          
+          {/* Address */}
+          <div>
+            <h4 style={css('font-family:var(--font-display);font-size:16px;color:#f4f1ea;margin:0 0 20px;font-weight:600;letter-spacing:0.5px;')}>ĐỊA CHỈ CHI NHÁNH</h4>
+            <p style={css('font-size:14px;color:#8b8578;line-height:1.6;margin:0;')}>
+              <span style={css('color:var(--gold);margin-right:6px;')}>⌖</span> 12 Lê Lợi, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh
+            </p>
+          </div>
+          
+          {/* Hotline */}
+          <div>
+            <h4 style={css('font-family:var(--font-display);font-size:16px;color:#f4f1ea;margin:0 0 20px;font-weight:600;letter-spacing:0.5px;')}>HOTLINE ĐẶT LỊCH</h4>
+            <p style={css('font-size:14px;color:#8b8578;line-height:1.6;margin:0;')}>
+              <span style={css('color:var(--gold);margin-right:6px;')}>☏</span> <a href="tel:19006789" style={css('color:#ffffff;text-decoration:none;font-weight:600;')} className="hov-gold">1900 6789</a><br />
+              <span style={css('color:var(--gold);margin-right:6px;')}>☏</span> <a href="tel:0901234567" style={css('color:#ffffff;text-decoration:none;font-weight:600;')} className="hov-gold">0901 234 567</a>
+            </p>
+          </div>
+          
+          {/* Hours */}
+          <div>
+            <h4 style={css('font-family:var(--font-display);font-size:16px;color:#f4f1ea;margin:0 0 20px;font-weight:600;letter-spacing:0.5px;')}>GIỜ MỞ CỬA</h4>
+            <p style={css('font-size:14px;color:#8b8578;line-height:1.6;margin:0;')}>
+              <span style={css('color:var(--gold);margin-right:6px;')}>◷</span> Thứ 2 – Chủ Nhật<br />
+              <span style={css('color:#ffffff;font-weight:600;')}>7:30 – 20:00</span>
+            </p>
+          </div>
+        </div>
+        
+        {/* Bottom Copyright */}
+        <div style={css('max-width:1400px;margin:0 auto;padding-top:30px;border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;')}>
+          <div style={css('font-size:13.5px;color:#6b665c;')}>
+            © {new Date().getFullYear()} AutoWash Pro. Tất cả quyền được bảo lưu.
+          </div>
+          <div style={css('font-size:13.5px;color:var(--gold);font-weight:500;letter-spacing:1px;')} className="hov-text">
+            DETAILING &amp; CHĂM SÓC XE CAO CẤP
+          </div>
         </div>
       </footer>
     </div>

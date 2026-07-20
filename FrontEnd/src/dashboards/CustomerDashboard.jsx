@@ -14,7 +14,7 @@ const PKGS = [
 ]
 const SLOTS = [{ t: '08:00', full: false }, { t: '09:30', full: true }, { t: '11:00', full: false }, { t: '13:30', full: true }, { t: '15:00', full: false }, { t: '16:30', full: false }, { t: '18:00', full: false }]
 const STATUS_FLOW = ['Pending', 'Confirmed', 'Checked-in', 'Waiting', 'Washing', 'Completed']
-const STATUS_VI = { Pending: 'Chờ xác nhận', Confirmed: 'Đã xác nhận', 'Checked-in': 'Đã nhận xe', Waiting: 'Đang chờ', Washing: 'Đang rửa', Completed: 'Hoàn thành', Cancelled: 'Đã huỷ' }
+const STATUS_VI = { Pending: 'Chờ xác nhận', Confirmed: 'Đã xác nhận', 'Checked-in': 'Đã check-in', Waiting: 'Đang chờ', Washing: 'Đang rửa', Completed: 'Hoàn thành', Cancelled: 'Đã huỷ' }
 const TIERS = [{ name: 'Member', min: 0 }, { name: 'Silver', min: 1000 }, { name: 'Gold', min: 2000 }, { name: 'Platinum', min: 5000 }]
 const TIER_DISCOUNT = { Member: 0, Silver: 0.05, Gold: 0.10, Platinum: 0.15 }
 const VOUCHERS = [
@@ -160,7 +160,12 @@ export default function CustomerDashboard({ user }) {
     if (!pw.old || !pw.n1) return setPw({ ...pw, error: 'Vui lòng nhập đầy đủ.' })
     if (pw.n1.length < 6) return setPw({ ...pw, error: 'Mật khẩu mới tối thiểu 6 ký tự.' })
     if (pw.n1 !== pw.n2) return setPw({ ...pw, error: 'Mật khẩu nhập lại không khớp.' })
-    setPw({ open: false, old: '', n1: '', n2: '', error: '' }); showToast('Đã đổi mật khẩu thành công.')
+    customerApi.changePassword(pw.old, pw.n1)
+        .then(() => {
+          setPw({ open: false, old: '', n1: '', n2: '', error: '' })
+          showToast('Đã đổi mật khẩu thành công.')
+        })
+        .catch((e) => setPw({ ...pw, error: e.response?.data?.message || 'Đổi mật khẩu thất bại.' }))
   }
 
   const openAddCar = () => { setCarEditId(null); setCarForm({ plate: '', brand: '', model: '', color: '' }); setCarError(''); setCarModal(true) }
@@ -179,7 +184,7 @@ export default function CustomerDashboard({ user }) {
         .then(() => { loadCars(); showToast('Đã xoá xe.') })
         .catch(() => showToast('Xoá xe thất bại.'))
   }
-  const openBooking = () => setBk({ open: true, step: 1, carId: cars[0]?.id || null, pkgId: null, date: '', time: '', pay: 'payos', voucherInput: '', voucher: null, error: '' })
+  const openBooking = () => setBk({ open: true, step: 1, carId: cars[0]?.id || null, pkgId: null, selectedPkgIds: [], date: '', time: '', pay: 'payos', voucherInput: '', voucher: null, error: '' })
   const applyVoucher = () => {
     const code = bk.voucherInput.trim()
     if (CODES[code] !== undefined) { setBk({ ...bk, voucher: { code, value: CODES[code] } }); showToast('Đã áp dụng mã ' + code + '.') }
@@ -187,10 +192,15 @@ export default function CustomerDashboard({ user }) {
   }
 
   const confirmBooking = () => {
+    if (bk.selectedPkgIds.length === 0) {
+      setBk({ ...bk, error: 'Vui lòng chọn ít nhất 1 dịch vụ.' })
+      return
+    }
     const scheduledTime = bk.date + 'T' + bk.time + ':00'
     bookingApi.create({
       vehicleId: bk.carId,
-      packageId: bk.pkgId,
+      packageId: bk.selectedPkgIds[0],
+      packageIds: bk.selectedPkgIds,
       scheduledTime,
     })
         .then(() => {
@@ -201,8 +211,13 @@ export default function CustomerDashboard({ user }) {
   }
 
   const computeTotal = () => {
-    const pkg = pkgById(bk.pkgId); if (!pkg) return { base: 0, total: 0, discountTier: 0, discountVoucher: 0 }
-    const base = Math.round(pkg.priceN * dayMult(dayType(bk.date)))
+    if (!bk.selectedPkgIds || bk.selectedPkgIds.length === 0) return { base: 0, total: 0, discountTier: 0, discountVoucher: 0 }
+    let baseSum = 0
+    bk.selectedPkgIds.forEach((id) => {
+      const p = pkgById(id)
+      if (p) baseSum += p.priceN
+    })
+    const base = Math.round(baseSum * dayMult(dayType(bk.date)))
     const tierD = Math.round(base * (TIER_DISCOUNT[tier] || 0))
     let vD = 0; if (bk.voucher) { const v = bk.voucher.value; vD = v < 1 ? Math.round((base - tierD) * v) : v }
     return { base, total: Math.max(0, base - tierD - vD), discountTier: tierD, discountVoucher: vD }
@@ -233,7 +248,7 @@ export default function CustomerDashboard({ user }) {
   useEffect(() => { loadBookings() }, [])
   const bkNext = () => {
     if (bk.step === 1) { if (!bk.carId) return setBk({ ...bk, error: 'Vui lòng chọn xe.' }); return setBk({ ...bk, step: 2, error: '' }) }
-    if (bk.step === 2) { if (!bk.pkgId) return setBk({ ...bk, error: 'Vui lòng chọn gói dịch vụ.' }); return setBk({ ...bk, step: 3, error: '' }) }
+    if (bk.step === 2) { if (!bk.selectedPkgIds || bk.selectedPkgIds.length === 0) return setBk({ ...bk, error: 'Vui lòng chọn ít nhất 1 dịch vụ.' }); return setBk({ ...bk, step: 3, error: '' }) }
     if (bk.step === 3) { if (!bk.date || !bk.time) return setBk({ ...bk, error: 'Vui lòng chọn ngày và khung giờ.' }); return setBk({ ...bk, step: 4, error: '' }) }
     if (bk.step === 4) return confirmBooking()
     setBk({ ...bk, open: false }); setTab('history')
@@ -290,11 +305,14 @@ export default function CustomerDashboard({ user }) {
   const hour = new Date().getHours()
   const greeting = hour < 11 ? 'Chào buổi sáng' : hour < 14 ? 'Chào buổi trưa' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối'
 
-  const selPkg = pkgById(bk.pkgId)
+  const selPkg = (bk.selectedPkgIds && bk.selectedPkgIds.length > 0) ? {
+    priceN: bk.selectedPkgIds.reduce((sum, id) => sum + (pkgById(id)?.priceN || 0), 0),
+    name: bk.selectedPkgIds.map((id) => pkgById(id)?.name).filter(Boolean).join(', ')
+  } : null
   const ct = computeTotal()
   const ti = tierInfo()
   const bkCarObj = carById(bk.carId)
-  const bkTitles = { 1: 'Chọn xe của bạn', 2: 'Chọn gói dịch vụ', 3: 'Chọn ngày & giờ', 4: 'Thanh toán', 5: 'Đặt lịch thành công' }
+  const bkTitles = { 1: 'Chọn xe của bạn', 2: 'Chọn dịch vụ', 3: 'Chọn ngày & giờ', 4: 'Thanh toán', 5: 'Đặt lịch thành công' }
   const bkNexts = { 1: 'Tiếp tục', 2: 'Tiếp tục', 3: 'Tiếp tục', 4: 'Xác nhận & thanh toán', 5: 'Xem lịch hẹn' }
   const bkBacks = { 1: 'Huỷ', 2: 'Quay lại', 3: 'Quay lại', 4: 'Quay lại', 5: 'Đóng' }
   const selBox = (active) => 'border:1.5px solid ' + (active ? 'var(--gold)' : 'rgba(255,255,255,0.14)') + ';background:' + (active ? 'rgba(200,162,83,0.08)' : 'transparent') + ';border-radius:12px;padding:16px 18px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px;'
@@ -512,15 +530,36 @@ export default function CustomerDashboard({ user }) {
                   <div className="two-col" style={css('display:grid;grid-template-columns:1.3fr 1fr;gap:16px;')}>
                     <div>
                       <h3 style={css('font-family:var(--font-display);font-size:19px;margin:0 0 14px;font-weight:500;')}>Đổi điểm lấy voucher</h3>
-                      <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:12px;')}>
-                        {VOUCHERS.map((v) => (
-                            <div key={v.id} style={css('border:1.5px solid rgba(255,255,255,0.16);border-radius:13px;padding:20px;')}>
-                              <div style={css('font-family:var(--font-display);font-size:17px;color:#f4f1ea;')}>{v.name}</div>
-                              <div style={css('font-size:12.5px;color:#8b8578;margin-top:4px;min-height:32px;')}>{v.desc}</div>
-                              <div style={css('font-size:13px;color:var(--gold);margin-top:8px;')}>{v.cost.toLocaleString('vi-VN')} điểm</div>
-                              <button onClick={() => redeem(v)} style={css('margin-top:16px;width:100%;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:600;' + (points >= v.cost ? 'background:var(--gold);color:#100f0c;cursor:pointer;' : 'background:rgba(255,255,255,0.06);color:#6f6a5e;cursor:not-allowed;'))}>{points >= v.cost ? 'Đổi ngay' : 'Chưa đủ điểm'}</button>
+                      <div style={css('display:flex;flex-direction:column;gap:14px;')}>
+                        {VOUCHERS.map((v) => {
+                          const canRedeem = points >= v.cost;
+                          return (
+                            <div key={v.id} style={css('position:relative;display:flex;border:1.5px solid ' + (canRedeem ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.12)') + ';border-radius:14px;background:#17150f;overflow:hidden;min-height:115px;')}>
+                              {/* Circle cutouts for ticket look */}
+                              <div style={css('position:absolute;top:50%;left:-8px;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:#0f0e0c;border-right:1.5px solid ' + (canRedeem ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.12)') + ';')}></div>
+                              <div style={css('position:absolute;top:50%;right:-8px;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:#0f0e0c;border-left:1.5px solid ' + (canRedeem ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.12)') + ';')}></div>
+                              
+                              {/* Main voucher info */}
+                              <div style={css('flex:1;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;position:relative;')}>
+                                {/* Sticker badge */}
+                                <div style={css('position:absolute;top:10px;right:10px;background:rgba(200,162,83,0.12);border:1px solid rgba(200,162,83,0.3);color:var(--gold);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:6px;text-transform:uppercase;')}>🎟️ GIFT</div>
+                                <div style={css('font-family:var(--font-display);font-size:17px;color:#f4f1ea;font-weight:600;margin-bottom:4px;')}>{v.name}</div>
+                                <div style={css('font-size:12.5px;color:#8b8578;line-height:1.4;padding-right:60px;')}>{v.desc}</div>
+                              </div>
+                              
+                              {/* Dashed vertical separator */}
+                              <div style={css('width:1px;border-left:2px dashed ' + (canRedeem ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.15)') + ';margin:10px 0;')}></div>
+                              
+                              {/* Claim section */}
+                              <div style={css('width:130px;padding:16px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,0.01);flex-shrink:0;')}>
+                                <div style={css('font-family:var(--font-display);font-size:13.5px;color:var(--gold);font-weight:600;margin-bottom:8px;text-align:center;line-height:1.2;')}>{v.cost.toLocaleString('vi-VN')}<br /><span style={css('font-size:10px;color:#8b8578;font-family:var(--font-body);')}>điểm</span></div>
+                                <button onClick={() => redeem(v)} className={canRedeem ? 'hov-bright' : ''} style={css('width:100%;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;' + (canRedeem ? 'background:var(--gold);color:#100f0c;cursor:pointer;' : 'background:rgba(255,255,255,0.05);color:#6f6a5e;cursor:not-allowed;'))}>
+                                  {canRedeem ? 'Đổi ngay' : 'Chưa đủ'}
+                                </button>
+                              </div>
                             </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                     <div>
@@ -542,7 +581,7 @@ export default function CustomerDashboard({ user }) {
 
         {/* CAR MODAL */}
         {carModal && (
-            <div onClick={() => setCarModal(false)} style={css('position:fixed;inset:0;z-index:100;background:rgba(8,7,6,0.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
+            <div onClick={() => setCarModal(false)} style={css('position:fixed;inset:0;z-index:100;background:rgba(15,14,12,0.45);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
               <div onClick={(e) => e.stopPropagation()} style={css('width:100%;max-width:460px;border:1.5px solid rgba(255,255,255,0.14);border-radius:18px;background:#16140f;padding:30px 32px;animation:fadeUp .35s ease both;')}>
                 <h3 style={css('font-family:var(--font-display);font-size:21px;margin:0 0 22px;font-weight:500;')}>{carEditId ? 'Chỉnh sửa thông tin xe' : 'Thêm xe mới'}</h3>
                 <div style={css('display:grid;grid-template-columns:1fr 1fr;gap:15px;')}>
@@ -562,7 +601,7 @@ export default function CustomerDashboard({ user }) {
 
         {/* BOOKING MODAL */}
         {bk.open && (
-            <div onClick={() => setBk({ ...bk, open: false })} style={css('position:fixed;inset:0;z-index:100;background:rgba(8,7,6,0.8);backdrop-filter:blur(6px);display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;')}>
+            <div onClick={() => setBk({ ...bk, open: false })} style={css('position:fixed;inset:0;z-index:100;background:rgba(15,14,12,0.45);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;')}>
               <div onClick={(e) => e.stopPropagation()} style={css('width:100%;max-width:660px;border:1.5px solid rgba(255,255,255,0.14);border-radius:20px;background:#16140f;animation:fadeUp .4s ease both;overflow:hidden;')}>
                 <div style={css('display:flex;align-items:center;justify-content:space-between;padding:24px 30px;border-bottom:1.5px solid rgba(255,255,255,0.1);')}>
                   <div>
@@ -586,12 +625,28 @@ export default function CustomerDashboard({ user }) {
                   )}
                   {bk.step === 2 && (
                       <div style={css('display:flex;flex-direction:column;gap:11px;')}>
-                        {pkgs.map((p) => (
-                            <div key={p.id} onClick={() => setBk({ ...bk, pkgId: p.id, error: '' })} style={css(selBox(bk.pkgId === p.id))}>
-                              <div style={css('flex:1;')}><div style={css('font-size:16px;color:#f4f1ea;font-family:var(--font-display);')}>{p.name}</div><div style={css('font-size:13px;color:#a39e92;margin-top:2px;')}>{p.desc}</div></div>
-                              <div style={css('font-family:var(--font-display);font-size:18px;color:var(--gold);white-space:nowrap;')}>{fmtVND(p.priceN)}</div>
+                        {pkgs.map((p) => {
+                          const selected = bk.selectedPkgIds.indexOf(p.id) !== -1
+                          const toggleService = () => {
+                            const newIds = selected 
+                              ? bk.selectedPkgIds.filter((x) => x !== p.id)
+                              : [...bk.selectedPkgIds, p.id]
+                            setBk({ ...bk, selectedPkgIds: newIds, error: '' })
+                          }
+                          const rowStyle = 'display:flex;align-items:center;gap:14px;padding:15px 18px;border-radius:13px;transition:all .15s;cursor:pointer;' +
+                            (selected ? 'border:1.5px solid var(--gold);background:rgba(200,162,83,0.08);'
+                              : 'border:1px solid rgba(255,255,255,0.1);background:#0f0e0c;')
+                          const checkStyle = 'width:24px;height:24px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;' +
+                            (selected ? 'background:linear-gradient(135deg,var(--gold-light),var(--gold));color:#100f0c;border:1px solid var(--gold);'
+                              : 'background:transparent;border:1.5px solid rgba(255,255,255,0.25);color:transparent;')
+                          return (
+                            <div key={p.id} onClick={toggleService} style={css(rowStyle)}>
+                              <div style={css(checkStyle)}>{selected ? '✓' : ''}</div>
+                              <div style={css('flex:1;')}><div style={css('font-size:15px;color:#f4f1ea;font-weight:500;')}>{p.name}</div><div style={css('font-size:12.5px;color:#a39e92;margin-top:2px;')}>{p.desc}</div></div>
+                              <div style={css('font-family:var(--font-display);font-size:16px;color:var(--gold);white-space:nowrap;')}>{fmtVND(p.priceN)}</div>
                             </div>
-                        ))}
+                          )
+                        })}
                       </div>
                   )}
                   {bk.step === 3 && (
@@ -646,7 +701,7 @@ export default function CustomerDashboard({ user }) {
                           {bk.voucher && <div style={css('font-size:12.5px;color:#6fcf97;margin-top:8px;')}>✓ Đã áp dụng mã {bk.voucher.code}</div>}
                         </div>
                         <div style={css('border:1.5px solid rgba(255,255,255,0.14);border-radius:13px;padding:20px 22px;display:flex;flex-direction:column;gap:11px;')}>
-                          <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Giá gói ({selPkg ? selPkg.name : '—'})</span><span style={css('color:#f4f1ea;')}>{fmtVND(ct.base)}</span></div>
+                          <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;flex:1;margin-right:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;')} title={selPkg ? selPkg.name : ''}>Chi phí ({selPkg ? selPkg.name : '—'})</span><span style={css('color:#f4f1ea;')}>{fmtVND(ct.base)}</span></div>
                           <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Chiết khấu hạng {ti.cur.name}</span><span style={css('color:#6fcf97;')}>− {fmtVND(ct.discountTier)}</span></div>
                           {ct.discountVoucher > 0 && <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Voucher</span><span style={css('color:#6fcf97;')}>− {fmtVND(ct.discountVoucher)}</span></div>}
                           <div style={css('height:1px;background:rgba(255,255,255,0.1);margin:2px 0;')}></div>
@@ -665,7 +720,7 @@ export default function CustomerDashboard({ user }) {
                         </div>
                         <div style={css('border:1.5px solid rgba(255,255,255,0.14);border-radius:13px;padding:20px 22px;text-align:left;display:flex;flex-direction:column;gap:10px;')}>
                           <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Xe</span><span style={css('color:#f4f1ea;text-align:right;')}>{bkCarObj ? (bkCarObj.brand + ' ' + bkCarObj.model + ' · ' + bkCarObj.plate) : '—'}</span></div>
-                          <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Gói</span><span style={css('color:#f4f1ea;')}>{selPkg ? selPkg.name : '—'}</span></div>
+                          <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;flex-shrink:0;margin-right:15px;')} title={selPkg ? selPkg.name : ''}>Dịch vụ</span><span style={css('color:#f4f1ea;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px;')} title={selPkg ? selPkg.name : ''}>{selPkg ? selPkg.name : '—'}</span></div>
                           <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Thời gian</span><span style={css('color:#f4f1ea;')}>{(bk.time || '—')} · {fmtD(bk.date)}</span></div>
                           <div style={css('display:flex;justify-content:space-between;font-size:14px;')}><span style={css('color:#8b8578;')}>Thanh toán</span><span style={css('color:#f4f1ea;text-align:right;')}>{bk.pay === 'payos' ? 'PayOS (chuyển khoản/QR)' : 'Tiền mặt tại quầy'}</span></div>
                           <div style={css('height:1px;background:rgba(255,255,255,0.1);margin:2px 0;')}></div>
@@ -684,7 +739,7 @@ export default function CustomerDashboard({ user }) {
 
         {/* PASSWORD MODAL */}
         {pw.open && (
-            <div onClick={() => setPw({ ...pw, open: false })} style={css('position:fixed;inset:0;z-index:100;background:rgba(8,7,6,0.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
+            <div onClick={() => setPw({ ...pw, open: false })} style={css('position:fixed;inset:0;z-index:100;background:rgba(15,14,12,0.45);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
               <div onClick={(e) => e.stopPropagation()} style={css('width:100%;max-width:420px;border:1.5px solid rgba(255,255,255,0.14);border-radius:18px;background:#16140f;padding:30px 32px;animation:fadeUp .35s ease both;')}>
                 <h3 style={css('font-family:var(--font-display);font-size:21px;margin:0 0 22px;font-weight:500;')}>Đổi mật khẩu</h3>
                 <div style={css('display:flex;flex-direction:column;gap:15px;')}>

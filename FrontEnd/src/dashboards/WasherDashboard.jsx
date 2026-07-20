@@ -22,6 +22,9 @@ export default function WasherDashboard() {
     const DOW_VI = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
     const todayStr = DOW_VI[now.getDay()] + ', ' + String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear()
 
+    const [dayTab, setDayTab] = useState('today')
+    const [subTab, setSubTab] = useState('active')
+
     const [allBookings, setAllBookings] = useState([])
     const ST = { WAITING: 'Waiting', WASHING: 'Washing', DRYING: 'Drying', COMPLETED: 'Completed', CHECKED_IN: 'Waiting', PENDING: 'Waiting', CONFIRMED: 'Waiting' }
 
@@ -33,19 +36,53 @@ export default function WasherDashboard() {
                 car: [b.carBrand, b.carModel].filter(Boolean).join(' ') || '—',
                 color: '—',
                 pkg: b.packageName || '—',
-                bay: 'Bay 1',
+                bay: b.bayNumber || 'Bay 1',
                 status: ST[b.status] || 'Waiting',
                 note: b.note || '',
+                scheduledTime: b.scheduledTime,
             }))))
             .catch(() => {})
     }
     useEffect(() => { loadJobs() }, [])
 
+    const isToday = (timeStr) => {
+        if (!timeStr) return false
+        const d = new Date(timeStr)
+        const t = new Date()
+        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear()
+    }
+    const isTomorrow = (timeStr) => {
+        if (!timeStr) return false
+        const d = new Date(timeStr)
+        const t = new Date()
+        t.setDate(t.getDate() + 1)
+        return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear()
+    }
+    const fmtTime = (timeStr) => {
+        if (!timeStr) return ''
+        const d = new Date(timeStr)
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+    }
+
     const jobs = allBookings
+    const todayJobs = allBookings.filter((b) => isToday(b.scheduledTime))
+    const tomorrowJobs = allBookings.filter((b) => isTomorrow(b.scheduledTime))
+
     const queueAll = allBookings
-        .filter((b) => ['Waiting', 'Washing', 'Drying'].includes(b.status))
+        .filter((b) => ['Waiting', 'Washing', 'Drying'].includes(b.status) && isToday(b.scheduledTime))
         .map((b) => ({ plate: b.plate, car: b.car, pkg: b.pkg, bay: b.bay, status: b.status }))
+
     const history = allBookings.filter((b) => b.status === 'Completed')
+    const completedToday = allBookings.filter((b) => b.status === 'Completed' && isToday(b.scheduledTime))
+    const activeToday = allBookings.filter((b) => isToday(b.scheduledTime) && ['Waiting', 'Washing', 'Drying'].includes(b.status))
+
+    const statusOrder = { Waiting: 0, Washing: 1, Drying: 2 }
+    const sortedActiveToday = [...activeToday].sort((a, b) => {
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+            return statusOrder[a.status] - statusOrder[b.status]
+        }
+        return b._rawId - a._rawId
+    })
 
     const [noteOpen, setNoteOpen] = useState(false)
     const [noteJobId, setNoteJobId] = useState(null)
@@ -78,11 +115,11 @@ export default function WasherDashboard() {
     }
 
     const NAV = [
-        { key: 'assigned', label: 'Xe phân công', icon: '⊞', badge: jobs.filter((j) => j.status !== 'Completed').length },
+        { key: 'assigned', label: 'Xe phân công', icon: '⊞', badge: activeToday.length },
         { key: 'queue', label: 'Hàng chờ', icon: '≡' },
         { key: 'schedule', label: 'Lịch sử làm việc', icon: '◷' },
     ]
-    const doneToday = jobs.filter((j) => j.status === 'Completed').length
+    const doneToday = completedToday.length
 
     const noteCarPlate = (allBookings.find((b) => b.id === noteJobId) || {}).plate || ''
 
@@ -118,7 +155,7 @@ export default function WasherDashboard() {
                     })}
                     <div style={css('margin-top:auto;border:1.5px solid rgba(200,162,83,0.3);border-radius:12px;padding:18px;background:rgba(200,162,83,0.04);')}>
                         <div style={css('font-size:12px;color:#8b8578;letter-spacing:0.5px;margin-bottom:8px;')}>CA HÔM NAY</div>
-                        <div style={css('font-family:var(--font-display);font-size:28px;color:var(--gold);')}>{doneToday}/{jobs.length}</div>
+                        <div style={css('font-family:var(--font-display);font-size:28px;color:var(--gold);')}>{completedToday.length}/{todayJobs.length}</div>
                         <div style={css('font-size:12.5px;color:#a39e92;margin-top:2px;')}>xe đã hoàn thành</div>
                     </div>
                 </aside>
@@ -127,55 +164,138 @@ export default function WasherDashboard() {
                     {tab === 'assigned' && (
                         <div style={css('animation:fadeUp .4s ease both;')}>
                             <h1 style={css('font-family:var(--font-display);font-size:28px;margin:0 0 4px;font-weight:500;')}>Xe được phân công</h1>
-                            <p style={css('font-size:14px;color:#8b8578;margin:0 0 26px;')}>Nhận xe vào bay và cập nhật trạng thái theo tiến trình rửa.</p>
-                            {jobs.length === 0 ? (
-                                <div style={css('text-align:center;padding:60px 20px;color:#8b8578;')}>
-                                    <div style={css('font-size:48px;margin-bottom:16px;')}>⊞</div>
-                                    <div style={css('font-size:16px;')}>Chưa có xe nào được phân công</div>
+                            <p style={css('font-size:14px;color:#8b8578;margin:0 0 20px;')}>Quản lý danh sách xe phân công rửa hôm nay và ngày mai.</p>
+                            
+                            {/* Day Tabs */}
+                            <div style={css('display:flex;gap:12px;margin-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px;')}>
+                                <button onClick={() => setDayTab('today')} style={css('background:transparent;border:none;color:' + (dayTab === 'today' ? 'var(--gold)' : '#8b8578') + ';font-size:15.5px;font-weight:600;cursor:pointer;padding:6px 16px;border-bottom:2px solid ' + (dayTab === 'today' ? 'var(--gold)' : 'transparent') + ';transition:all .2s; outline:none;')} className="hov-gold">
+                                    Hôm nay ({todayJobs.length})
+                                </button>
+                                <button onClick={() => setDayTab('tomorrow')} style={css('background:transparent;border:none;color:' + (dayTab === 'tomorrow' ? 'var(--gold)' : '#8b8578') + ';font-size:15.5px;font-weight:600;cursor:pointer;padding:6px 16px;border-bottom:2px solid ' + (dayTab === 'tomorrow' ? 'var(--gold)' : 'transparent') + ';transition:all .2s; outline:none;')} className="hov-gold">
+                                    Ngày mai ({tomorrowJobs.length})
+                                </button>
+                            </div>
+
+                            {dayTab === 'today' ? (
+                                <div>
+                                    {/* Subtabs for Today */}
+                                    <div style={css('display:flex;gap:10px;margin-bottom:24px;')}>
+                                        <button onClick={() => setSubTab('active')} style={css('border:none;border-radius:20px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;' + (subTab === 'active' ? 'background:var(--gold);color:#100f0c;' : 'background:rgba(255,255,255,0.06);color:#a39e92;'))}>
+                                            Đang làm ({sortedActiveToday.length})
+                                        </button>
+                                        <button onClick={() => setSubTab('completed')} style={css('border:none;border-radius:20px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;' + (subTab === 'completed' ? 'background:var(--gold);color:#100f0c;' : 'background:rgba(255,255,255,0.06);color:#a39e92;'))}>
+                                            Hoàn thành ({completedToday.length})
+                                        </button>
+                                    </div>
+
+                                    {subTab === 'active' ? (
+                                        sortedActiveToday.length === 0 ? (
+                                            <div style={css('text-align:center;padding:60px 20px;color:#8b8578;')}>
+                                                <div style={css('font-size:40px;margin-bottom:12px;')}>✓</div>
+                                                <div style={css('font-size:15px;')}>Đã hoàn thành sạch sẽ tất cả xe của hôm nay!</div>
+                                            </div>
+                                        ) : (
+                                            <div className="two-col" style={css('display:grid;grid-template-columns:repeat(2,1fr);gap:14px;')}>
+                                                {sortedActiveToday.map((j) => {
+                                                    const cur = FLOW.indexOf(j.status); const done = j.status === 'Completed'
+                                                    return (
+                                                        <div key={j.id} style={css('border:1.5px solid ' + (j.status === 'Washing' ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.16)') + ';border-radius:16px;padding:22px 24px;background:#13110c;')}>
+                                                            <div style={css('display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;')}>
+                                                                <div>
+                                                                    <div style={css('font-family:var(--font-display);font-size:19px;')}>{j.plate}</div>
+                                                                    <div style={css('font-size:13.5px;color:#a39e92;margin-top:3px;')}>{j.car} · {j.color}</div>
+                                                                    <div style={css('font-size:12.5px;color:#8b8578;margin-top:2px;')}>{j.id} · {j.bay} · {fmtTime(j.scheduledTime)}</div>
+                                                                </div>
+                                                                <span style={css(badge(j.status))}>{STATUS_VI[j.status]}</span>
+                                                            </div>
+                                                            <div style={css('background:rgba(200,162,83,0.06);border-radius:10px;padding:11px 14px;margin-bottom:16px;')}>
+                                                                <div style={css('font-size:12px;color:#8b8578;')}>Gói dịch vụ</div>
+                                                                <div style={css('font-size:14.5px;color:#f4f1ea;margin-top:2px;')}>{j.pkg}</div>
+                                                            </div>
+                                                            <div style={css('display:flex;align-items:center;margin-bottom:18px;')}>
+                                                                {FLOW.map((f, i) => {
+                                                                    const mark = (i < cur || (done && i === cur)) ? '✓' : ''
+                                                                    const dot = 'width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;z-index:2;' +
+                                                                        (i < cur ? 'background:var(--gold);color:#100f0c;' : i === cur ? 'background:var(--gold);color:#100f0c;' + (done ? '' : 'box-shadow:0 0 0 4px rgba(200,162,83,0.18);animation:pulse 1.4s ease-in-out infinite;') : 'background:#1c1a14;border:1.5px solid rgba(255,255,255,0.15);color:#6f6a5e;')
+                                                                    const line = i === 0 ? 'display:none;' : 'position:absolute;top:13px;right:50%;width:100%;height:2px;z-index:1;' + (i <= cur ? 'background:var(--gold);' : 'background:rgba(255,255,255,0.12);')
+                                                                    const label = 'font-size:10.5px;margin-top:7px;text-align:center;line-height:1.2;color:' + (i <= cur ? '#c4bfb2' : '#6f6a5e') + ';'
+                                                                    return (
+                                                                        <div key={i} style={css('flex:1;display:flex;flex-direction:column;align-items:center;position:relative;')}>
+                                                                            <div style={css(line)}></div>
+                                                                            <div style={css(dot)}>{mark}</div>
+                                                                            <div style={css(label)}>{STATUS_VI[f]}</div>
+                                                                        </div>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                            <div style={css('display:flex;gap:9px;')}>
+                                                                <button onClick={() => advance(j.id)} style={css('flex:1;background:var(--gold);border:none;color:#100f0c;padding:11px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;')}>{NEXT_LABEL[j.status]}</button>
+                                                                <button onClick={() => openNote(j.id)} className="hov-border-gold" style={css('background:transparent;border:1.5px solid rgba(255,255,255,0.16);color:#c4bfb2;padding:11px 16px;border-radius:11px;font-size:13.5px;cursor:pointer;')}>Ghi chú</button>
+                                                            </div>
+                                                            {j.note && <div style={css('margin-top:12px;font-size:12.5px;color:#e0a36a;background:rgba(224,163,106,0.1);border-radius:9px;padding:9px 12px;')}>⚠ {j.note}</div>}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    ) : (
+                                        completedToday.length === 0 ? (
+                                            <div style={css('text-align:center;padding:50px 20px;color:#8b8578;font-size:14.5px;')}>
+                                                Chưa có xe nào hoàn thành trong hôm nay.
+                                            </div>
+                                        ) : (
+                                            <div className="two-col" style={css('display:grid;grid-template-columns:repeat(2,1fr);gap:14px;')}>
+                                                {completedToday.map((j) => (
+                                                    <div key={j.id} style={css('border:1.5px solid rgba(255,255,255,0.14);border-radius:16px;padding:22px 24px;background:#0e1c14;opacity:0.85;')}>
+                                                        <div style={css('display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;')}>
+                                                            <div>
+                                                                <div style={css('font-family:var(--font-display);font-size:19px;color:#f4f1ea;')}>{j.plate}</div>
+                                                                <div style={css('font-size:13.5px;color:#a39e92;margin-top:3px;')}>{j.car}</div>
+                                                                <div style={css('font-size:12.5px;color:#8b8578;margin-top:2px;')}>{j.id} · {j.bay} · {fmtTime(j.scheduledTime)}</div>
+                                                            </div>
+                                                            <span style={css('padding:6px 13px;border-radius:20px;font-size:12.5px;font-weight:600;color:#6fcf97;background:rgba(111,207,151,0.14);')}>Đã xong</span>
+                                                        </div>
+                                                        <div style={css('background:rgba(111,207,151,0.06);border-radius:10px;padding:11px 14px;margin-bottom:12px;')}>
+                                                            <div style={css('font-size:12px;color:#8b8578;')}>Gói dịch vụ</div>
+                                                            <div style={css('font-size:14.5px;color:#f4f1ea;margin-top:2px;')}>{j.pkg}</div>
+                                                        </div>
+                                                        <button onClick={() => openNote(j.id)} className="hov-border-gold" style={css('width:100%;background:transparent;border:1.5px solid rgba(255,255,255,0.16);color:#c4bfb2;padding:10px;border-radius:11px;font-size:13px;cursor:pointer;')}>Xem / Sửa ghi chú</button>
+                                                        {j.note && <div style={css('margin-top:12px;font-size:12.5px;color:#e0a36a;background:rgba(224,163,106,0.1);border-radius:9px;padding:9px 12px;')}>⚠ {j.note}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
+                                    )}
                                 </div>
                             ) : (
-                                <div className="two-col" style={css('display:grid;grid-template-columns:repeat(2,1fr);gap:14px;')}>
-                                    {jobs.map((j) => {
-                                        const cur = FLOW.indexOf(j.status); const done = j.status === 'Completed'
-                                        return (
-                                            <div key={j.id} style={css('border:1.5px solid ' + (j.status === 'Washing' ? 'rgba(200,162,83,0.4)' : 'rgba(255,255,255,0.16)') + ';border-radius:16px;padding:22px 24px;')}>
+                                tomorrowJobs.length === 0 ? (
+                                    <div style={css('text-align:center;padding:60px 20px;color:#8b8578;')}>
+                                        <div style={css('font-size:40px;margin-bottom:12px;')}>◷</div>
+                                        <div style={css('font-size:15px;')}>Chưa có lịch phân công cho ngày mai.</div>
+                                    </div>
+                                ) : (
+                                    <div className="two-col" style={css('display:grid;grid-template-columns:repeat(2,1fr);gap:14px;')}>
+                                        {tomorrowJobs.map((j) => (
+                                            <div key={j.id} style={css('border:1.5px solid rgba(255,255,255,0.1);border-radius:16px;padding:22px 24px;background:#111215;opacity:0.9;')}>
                                                 <div style={css('display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;')}>
                                                     <div>
-                                                        <div style={css('font-family:var(--font-display);font-size:19px;')}>{j.plate}</div>
+                                                        <div style={css('font-family:var(--font-display);font-size:19px;color:#9b8cf0;')}>{j.plate}</div>
                                                         <div style={css('font-size:13.5px;color:#a39e92;margin-top:3px;')}>{j.car} · {j.color}</div>
                                                         <div style={css('font-size:12.5px;color:#8b8578;margin-top:2px;')}>{j.id} · {j.bay}</div>
                                                     </div>
-                                                    <span style={css(badge(j.status))}>{STATUS_VI[j.status]}</span>
+                                                    <span style={css('padding:6px 13px;border-radius:20px;font-size:12.5px;font-weight:600;color:#9b8cf0;background:rgba(155,140,240,0.14);')}>Ngày mai</span>
                                                 </div>
-                                                <div style={css('background:rgba(200,162,83,0.06);border-radius:10px;padding:11px 14px;margin-bottom:16px;')}>
-                                                    <div style={css('font-size:12px;color:#8b8578;')}>Gói dịch vụ</div>
+                                                <div style={css('background:rgba(255,255,255,0.03);border-radius:10px;padding:11px 14px;margin-bottom:12px;')}>
+                                                    <div style={css('font-size:12px;color:#8b8578;display:flex;justify-content:space-between;')}><span>Gói dịch vụ</span><span style={css('color:var(--gold);font-weight:600;')}>{fmtTime(j.scheduledTime)}</span></div>
                                                     <div style={css('font-size:14.5px;color:#f4f1ea;margin-top:2px;')}>{j.pkg}</div>
                                                 </div>
-                                                <div style={css('display:flex;align-items:center;margin-bottom:18px;')}>
-                                                    {FLOW.map((f, i) => {
-                                                        const mark = (i < cur || (done && i === cur)) ? '✓' : ''
-                                                        const dot = 'width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;z-index:2;' +
-                                                            (i < cur ? 'background:var(--gold);color:#100f0c;' : i === cur ? 'background:var(--gold);color:#100f0c;' + (done ? '' : 'box-shadow:0 0 0 4px rgba(200,162,83,0.18);animation:pulse 1.4s ease-in-out infinite;') : 'background:#1c1a14;border:1.5px solid rgba(255,255,255,0.15);color:#6f6a5e;')
-                                                        const line = i === 0 ? 'display:none;' : 'position:absolute;top:13px;right:50%;width:100%;height:2px;z-index:1;' + (i <= cur ? 'background:var(--gold);' : 'background:rgba(255,255,255,0.12);')
-                                                        const label = 'font-size:10.5px;margin-top:7px;text-align:center;line-height:1.2;color:' + (i <= cur ? '#c4bfb2' : '#6f6a5e') + ';'
-                                                        return (
-                                                            <div key={i} style={css('flex:1;display:flex;flex-direction:column;align-items:center;position:relative;')}>
-                                                                <div style={css(line)}></div>
-                                                                <div style={css(dot)}>{mark}</div>
-                                                                <div style={css(label)}>{STATUS_VI[f]}</div>
-                                                            </div>
-                                                        )
-                                                    })}
+                                                <div style={css('font-size:12.5px;color:#8b8578;text-align:center;padding:8px;border:1px dashed rgba(255,255,255,0.1);border-radius:8px;')}>
+                                                    Chờ đến ngày mai để bắt đầu
                                                 </div>
-                                                <div style={css('display:flex;gap:9px;')}>
-                                                    <button onClick={() => advance(j.id)} style={css(done ? 'flex:1;background:rgba(111,207,151,0.12);border:1px solid rgba(111,207,151,0.3);color:#6fcf97;padding:11px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:default;' : 'flex:1;background:var(--gold);border:none;color:#100f0c;padding:11px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;')}>{NEXT_LABEL[j.status]}</button>
-                                                    <button onClick={() => openNote(j.id)} className="hov-border-gold" style={css('background:transparent;border:1.5px solid rgba(255,255,255,0.16);color:#c4bfb2;padding:11px 16px;border-radius:11px;font-size:13.5px;cursor:pointer;')}>Ghi chú</button>
-                                                </div>
-                                                {j.note && <div style={css('margin-top:12px;font-size:12.5px;color:#e0a36a;background:rgba(224,163,106,0.1);border-radius:9px;padding:9px 12px;')}>⚠ {j.note}</div>}
                                             </div>
-                                        )
-                                    })}
-                                </div>
+                                        ))}
+                                    </div>
+                                )
                             )}
                         </div>
                     )}
@@ -238,7 +358,7 @@ export default function WasherDashboard() {
             </div>
 
             {noteOpen && (
-                <div onClick={() => setNoteOpen(false)} style={css('position:fixed;inset:0;z-index:100;background:rgba(8,7,6,0.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
+                <div onClick={() => setNoteOpen(false)} style={css('position:fixed;inset:0;z-index:100;background:rgba(15,14,12,0.45);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;')}>
                     <div onClick={(e) => e.stopPropagation()} style={css('width:100%;max-width:440px;border:1.5px solid rgba(255,255,255,0.14);border-radius:18px;background:#16140f;padding:28px 30px;animation:fadeUp .35s ease both;')}>
                         <h3 style={css('font-family:var(--font-display);font-size:20px;margin:0 0 6px;font-weight:500;')}>Ghi chú vấn đề phát sinh</h3>
                         <p style={css('font-size:13px;color:#8b8578;margin:0 0 18px;')}>Xe {noteCarPlate}</p>

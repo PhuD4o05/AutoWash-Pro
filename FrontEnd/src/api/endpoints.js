@@ -9,6 +9,7 @@ export const authApi = {
 export const customerApi = {
   me: () => api.get('/customers/me').then((r) => r.data),
   updateMe: (payload) => api.put('/customers/me', payload).then((r) => r.data),
+  changePassword: (oldPassword, newPassword) => api.put('/customers/me/change-password', { oldPassword, newPassword }).then((r) => r.data),
 }
 
 export const loyaltyApi = {
