@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { css } from '../lib/css'
 import { fmtVND } from '../lib/format'
 import Toast from '../components/Toast'
-import { useLocalStorage } from '../hooks/useLocalStorage'
+Dashboar
 import { receptionApi, publicApi } from '../api/endpoints'
 
 const STATUS_VI = { Confirmed: 'Đã xác nhận', 'Checked-in': 'Đã nhận xe', Waiting: 'Đang chờ', Washing: 'Đang rửa', Drying: 'Đang sấy', Completed: 'Hoàn thành', Cancelled: 'Đã huỷ', Pending: 'Chờ xác nhận' }
@@ -15,6 +15,11 @@ const badge = (st) => {
 }
 const inp = 'background:#0f0e0c;border:1.5px solid rgba(255,255,255,0.14);border-radius:11px;padding:13px 15px;color:#f4f1ea;font-size:14.5px;'
 
+// ---- style dropdown header (đồng bộ với AdminDashboard) ----
+const hBtn = (active) => 'display:inline-flex;align-items:center;gap:5px;background:transparent;border:none;cursor:pointer;font-size:12px;color:' + (active ? 'var(--gold)' : '#8b8578') + ';letter-spacing:0.5px;text-transform:uppercase;font-family:var(--font-body);padding:0;'
+const hMenu = 'position:absolute;top:calc(100% + 8px);left:0;z-index:60;min-width:170px;max-height:320px;overflow:auto;background:#16140f;border:1.5px solid rgba(255,255,255,0.16);border-radius:12px;padding:6px;box-shadow:0 14px 34px rgba(0,0,0,0.55);'
+const hItem = (active) => 'display:block;width:100%;text-align:left;background:' + (active ? 'rgba(200,162,83,0.12)' : 'transparent') + ';border:none;border-radius:8px;padding:9px 12px;font-size:13px;color:' + (active ? 'var(--gold)' : '#c4bfb2') + ';cursor:pointer;font-family:var(--font-body);'
+
 export default function ReceptionDashboard() {
   const [tab, setTab] = useState('checkin')
   const [phoneLookup, setPhoneLookup] = useState('')
@@ -25,7 +30,18 @@ export default function ReceptionDashboard() {
   const [bays, setBays] = useState([])
   const [pkgs, setPkgs] = useState([])
 
+  const [custSearch, setCustSearch] = useState('')
+  const [sortName, setSortName] = useState('')      // '' | 'az' | 'za'
+  const [filterTier, setFilterTier] = useState('')  // '' | MEMBER | SILVER | GOLD | PLATINUM
+  const [sortPoints, setSortPoints] = useState('')  // '' | 'asc' | 'desc'
+  const [openMenu, setOpenMenu] = useState(null)
 
+  // đóng dropdown header khi click ra ngoài
+  useEffect(() => {
+    const close = () => setOpenMenu(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [])
 
   // Quản lý khách vẫn là localStorage (BE chưa có list/CRUD khách cho reception -> sẽ nối ở Admin)
   const [customers, setCustomers] = useState([])
@@ -79,6 +95,17 @@ export default function ReceptionDashboard() {
   const queue = allBookings.filter((b) => ['Confirmed', 'Checked-in', 'Waiting', 'Washing', 'Drying', 'Pending'].includes(b.status))
   const pay = allBookings.filter((b) => b.status === 'Completed' && !b.paid)
 
+  const bayPlan = (() => {
+    const free = bays.filter((b) => !b.busy).map((b) => b.name)
+    const plan = {}
+    let i = 0
+    queue.forEach((q) => {
+      if (q.bay) { plan[q.id] = q.bay; return }
+      if (i < free.length) { plan[q.id] = free[i]; i++ }
+    })
+    return plan
+  })()
+
   const [paySelId, setPaySelId] = useState(null)
   const [payVoucherInput, setPayVoucherInput] = useState('')
   const [payVoucher, setPayVoucher] = useState(null)
@@ -89,6 +116,7 @@ export default function ReceptionDashboard() {
   const [toast, setToast] = useState('')
   const tt = useRef(null)
   const showToast = (m) => { setToast(m); clearTimeout(tt.current); tt.current = setTimeout(() => setToast(''), 3000) }
+  const [payMethod, setPayMethod] = useState('cash') // 'cash' | 'qr'
 
   const lookupPhone = () => {
     receptionApi.lookupCustomer(phoneLookup.replace(/\s/g, ''))
@@ -181,6 +209,17 @@ export default function ReceptionDashboard() {
   const receptionName = localStorage.getItem('fullName') || 'Lễ tân'
   const custResetName = (customers.find((c) => c.id === custResetId) || {}).name || ''
 
+  const custView = (() => {
+    let arr = customers.filter((c) => {
+      const q = custSearch.trim().toLowerCase()
+      return !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || String(c.id).includes(q)
+    })
+    if (filterTier) arr = arr.filter((c) => String(c.tier || '').toUpperCase() === filterTier)
+    if (sortName) arr = [...arr].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi') * (sortName === 'az' ? 1 : -1))
+    else if (sortPoints) arr = [...arr].sort((a, b) => ((a.points || 0) - (b.points || 0)) * (sortPoints === 'asc' ? 1 : -1))
+    return arr
+  })()
+
   return (
       <div style={css('background:#0f0e0c;color:#f4f1ea;min-height:100vh;')}>
         <header style={css('position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:15px 30px;background:rgba(15,14,12,0.92);backdrop-filter:blur(14px);border-bottom:1.5px solid rgba(255,255,255,0.12);')}>
@@ -227,7 +266,7 @@ export default function ReceptionDashboard() {
             {tab === 'checkin' && (
                 <div style={css('animation:fadeUp .4s ease both;')}>
                   <h1 style={css('font-family:var(--font-display);font-size:28px;margin:0 0 4px;font-weight:500;')}>Check-in khách hàng</h1>
-                  <p style={css('font-size:14px;color:#8b8578;margin:0 0 26px;')}>Tra cứu bằng số điện thoại hoặc tạo lịch cho khách vãng lai.</p>
+                  <p style={css('font-size:14px;color:#8b8578;margin:0 0 26px;')}>Tìm kiếm bằng số điện thoại hoặc đặt lịch cho khách vãng lai.</p>
                   <div className="two-col" style={css('display:grid;grid-template-columns:340px 1fr;gap:18px;')}>
                     <div style={css('border:1.5px solid rgba(255,255,255,0.16);border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:center;')}>
                       <div style={css('font-size:13px;color:#a39e92;align-self:flex-start;margin-bottom:16px;letter-spacing:0.5px;')}>QUÉT MÃ QR</div>
@@ -237,6 +276,7 @@ export default function ReceptionDashboard() {
                       </div>
                       <button onClick={scanQr} className="hov-bright" style={css('margin-top:18px;width:100%;background:var(--gold);border:none;color:#100f0c;padding:13px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;')}>Mô phỏng quét QR</button>
                     </div>
+
 
                     <div style={css('display:flex;flex-direction:column;gap:18px;')}>
                       <div style={css('border:1.5px solid rgba(255,255,255,0.16);border-radius:16px;padding:24px;')}>
@@ -294,7 +334,7 @@ export default function ReceptionDashboard() {
                                 <div style={css('font-size:13px;color:#a39e92;margin-top:3px;')}>{q.pkg} · {q.id}</div>
                               </div>
                               <span style={css(badge(q.status))}>{STATUS_VI[q.status]}</span>
-                              <select value={q.bay || ''} onChange={(e) => setBay(q.id, e.target.value)} className="foc-gold" style={css('background:#0f0e0c;border:1.5px solid rgba(255,255,255,0.16);border-radius:10px;padding:9px 12px;color:#f4f1ea;font-size:13px;cursor:pointer;min-width:120px;')}>
+                              <select value={q.bay || bayPlan[q.id] || ''} onChange={(e) => setBay(q.id, e.target.value)} className="foc-gold" style={css('background:#0f0e0c;border:1.5px solid rgba(255,255,255,0.16);border-radius:10px;padding:9px 12px;color:#f4f1ea;font-size:13px;cursor:pointer;min-width:120px;')}>
                                 <option value="">— Chọn bay —</option>
                                 {bays.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
                               </select>
@@ -315,7 +355,7 @@ export default function ReceptionDashboard() {
                       {pay.length === 0 ? (
                           <div style={css('text-align:center;padding:40px 20px;color:#8b8578;')}>Không có đơn nào cần thu tiền.</div>
                       ) : pay.map((p) => (
-                          <div key={p.id} onClick={() => { setPaySelId(p.id); setPayVoucher(null); setPayVoucherInput('') }} style={css('display:flex;align-items:center;gap:16px;border:1.5px solid ' + (paySelId === p.id ? 'var(--gold)' : 'rgba(255,255,255,0.16)') + ';background:' + (paySelId === p.id ? 'rgba(200,162,83,0.06)' : 'transparent') + ';border-radius:14px;padding:18px 22px;cursor:pointer;transition:all .15s;')}>
+                          <div key={p.id} onClick={() => { setPaySelId(p.id); setPayVoucher(null); setPayVoucherInput(''); setPayMethod('cash') }} style={css('display:flex;align-items:center;gap:16px;border:1.5px solid ' + (paySelId === p.id ? 'var(--gold)' : 'rgba(255,255,255,0.16)') + ';background:' + (paySelId === p.id ? 'rgba(200,162,83,0.06)' : 'transparent') + ';border-radius:14px;padding:18px 22px;cursor:pointer;transition:all .15s;')}>
                             <div style={css('flex:1;')}>
                               <div style={css('font-family:var(--font-display);font-size:16px;')}>{p.name}</div>
                               <div style={css('font-size:13px;color:#a39e92;margin-top:3px;')}>{p.pkg} · {p.plate} · {p.id}</div>
@@ -338,8 +378,29 @@ export default function ReceptionDashboard() {
                               {disc > 0 && <div style={css('display:flex;justify-content:space-between;font-size:13.5px;')}><span style={css('color:#8b8578;')}>Voucher {payVoucher.code}</span><span style={css('color:#6fcf97;')}>− {fmtVND(disc)}</span></div>}
                               <div style={css('display:flex;justify-content:space-between;align-items:baseline;')}><span style={css('color:#c4bfb2;font-size:14.5px;')}>Phải thu</span><span style={css('font-family:var(--font-display);font-size:22px;color:var(--gold);')}>{fmtVND(total)}</span></div>
                             </div>
+                            <div style={css('display:flex;gap:9px;margin-bottom:16px;')}>
+                              {[['cash', 'Tiền mặt'], ['qr', 'Chuyển khoản QR']].map(([m, label]) => {
+                                const on = payMethod === m
+                                return (
+                                    <button key={m} onClick={() => setPayMethod(m)} style={css('flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);' + (on ? 'background:rgba(200,162,83,0.12);border:1.5px solid var(--gold);color:var(--gold);' : 'background:transparent;border:1.5px solid rgba(255,255,255,0.14);color:#a39e92;'))}>{label}</button>
+                                )
+                              })}
+                            </div>
+
+                            {/* Ô QR — mẫu, để sẵn móc API */}
+                            {payMethod === 'qr' && (
+                                <div style={css('display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:16px;padding:18px;border:1.5px solid rgba(255,255,255,0.12);border-radius:12px;background:#0a0908;')}>
+                                  <img src={'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent('AUTOWASH|' + cur.id + '|' + total)} alt="QR thanh toán" style={css('width:180px;height:180px;border-radius:8px;background:#fff;padding:6px;')} />
+                                  <div style={css('font-size:12.5px;color:#8b8578;text-align:center;')}>Quét mã để chuyển khoản {fmtVND(total)}</div>
+                                </div>
+                            )}
                             <div style={css('display:flex;gap:9px;')}>
-                              <button onClick={doPay} className="hov-bright" style={css('flex:1;background:var(--gold);border:none;color:#100f0c;padding:13px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;')}>Xác nhận thu tiền</button>
+                              {payMethod === 'cash' && (
+                                  <button onClick={doPay} className="hov-bright" style={css('flex:1;background:var(--gold);border:none;color:#100f0c;padding:13px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;')}>Hoàn tất</button>
+                              )}
+                              {payMethod === 'qr' && (
+                                  <button onClick={doPay} className="hov-bright" style={css('flex:1;background:var(--gold);border:none;color:#100f0c;padding:13px;border-radius:11px;font-size:13.5px;font-weight:600;cursor:pointer;')}>Xác nhận thu tiền</button>
+                              )}
                             </div>
                           </>
                       ) : (
@@ -352,17 +413,62 @@ export default function ReceptionDashboard() {
 
             {tab === 'customers' && (
                 <div style={css('animation:fadeUp .4s ease both;')}>
-                  <div style={css('display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:14px;')}>
-                    <div><h1 style={css('font-family:var(--font-display);font-size:28px;margin:0 0 4px;font-weight:500;')}>Hỗ trợ khách hàng</h1><p style={css('font-size:14px;color:#8b8578;margin:0;')}>ạo tài khoản và đặt lại mật khẩu cho khách..</p></div>
+                  <div style={css('display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px;')}>
+                    <div><h1 style={css('font-family:var(--font-display);font-size:28px;margin:0 0 4px;font-weight:500;')}>Hỗ trợ khách hàng</h1><p style={css('font-size:14px;color:#8b8578;margin:0;')}></p></div>
                     <button onClick={openCreateCust} className="hov-bright" style={css('background:var(--gold);border:none;color:#100f0c;padding:12px 22px;border-radius:30px;font-size:14px;font-weight:600;cursor:pointer;')}>+ Tạo tài khoản khách</button>
                   </div>
-                  <div style={css('border:1.5px solid rgba(255,255,255,0.16);border-radius:14px;overflow:hidden;')}>
-                    <div style={css('display:grid;grid-template-columns:1.4fr 1fr 0.9fr 0.9fr 130px;padding:14px 22px;background:rgba(255,255,255,0.03);font-size:12px;color:#8b8578;letter-spacing:0.5px;text-transform:uppercase;')}>
-                      <span>Khách hàng</span><span>Số điện thoại</span><span>Hạng</span><span>Điểm</span><span style={css('text-align:right;')}>Thao tác</span>
+
+                  {/* ô tìm kiếm */}
+                  <div style={css('position:relative;margin-bottom:18px;max-width:420px;')}>
+                    <input value={custSearch} onChange={(e) => setCustSearch(e.target.value)} placeholder="Tìm theo tên, SĐT, mã khách..." className="foc-gold" style={css(inp + 'width:100%;padding-right:40px;')} />
+                    {custSearch && <button onClick={() => setCustSearch('')} style={css('position:absolute;right:12px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#8b8578;font-size:18px;cursor:pointer;line-height:1;')}>×</button>}
+                  </div>
+
+                  <div style={css('border:1.5px solid rgba(255,255,255,0.16);border-radius:14px;overflow:visible;')}>
+                    <div style={css('display:grid;grid-template-columns:1.4fr 1fr 0.9fr 0.9fr 130px;padding:14px 22px;background:rgba(255,255,255,0.03);border-radius:12px 12px 0 0;font-size:12px;letter-spacing:0.5px;align-items:center;')}>
+                      {/* KHÁCH HÀNG - sort tên */}
+                      <div style={css('position:relative;')} onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => setOpenMenu(openMenu === 'cname' ? null : 'cname')} style={css(hBtn(!!sortName))}>Khách hàng <span style={css('font-size:9px;')}>▼</span></button>
+                        {openMenu === 'cname' && (
+                            <div style={css(hMenu)}>
+                              <button onClick={() => { setSortName('az'); setSortPoints(''); setOpenMenu(null) }} style={css(hItem(sortName === 'az'))}>A → Z</button>
+                              <button onClick={() => { setSortName('za'); setSortPoints(''); setOpenMenu(null) }} style={css(hItem(sortName === 'za'))}>Z → A</button>
+                              <button onClick={() => { setSortName(''); setOpenMenu(null) }} style={css(hItem(!sortName))}>Bỏ sắp xếp</button>
+                            </div>
+                        )}
+                      </div>
+
+                      <span style={css('font-size:12px;color:#8b8578;text-transform:uppercase;')}>Số điện thoại</span>
+
+                      {/* HẠNG - lọc */}
+                      <div style={css('position:relative;')} onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => setOpenMenu(openMenu === 'tier' ? null : 'tier')} style={css(hBtn(!!filterTier))}>Hạng <span style={css('font-size:9px;')}>▼</span></button>
+                        {openMenu === 'tier' && (
+                            <div style={css(hMenu)}>
+                              {[['', 'Tất cả'], ['MEMBER', 'Member'], ['SILVER', 'Silver'], ['GOLD', 'Gold'], ['PLATINUM', 'Platinum']].map(([k, l]) => (
+                                  <button key={k} onClick={() => { setFilterTier(k); setOpenMenu(null) }} style={css(hItem(filterTier === k))}>{l}</button>
+                              ))}
+                            </div>
+                        )}
+                      </div>
+
+                      {/* ĐIỂM - sort */}
+                      <div style={css('position:relative;')} onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => setOpenMenu(openMenu === 'points' ? null : 'points')} style={css(hBtn(!!sortPoints))}>Điểm <span style={css('font-size:9px;')}>▼</span></button>
+                        {openMenu === 'points' && (
+                            <div style={css(hMenu)}>
+                              <button onClick={() => { setSortPoints('asc'); setSortName(''); setOpenMenu(null) }} style={css(hItem(sortPoints === 'asc'))}>Thấp → Cao</button>
+                              <button onClick={() => { setSortPoints('desc'); setSortName(''); setOpenMenu(null) }} style={css(hItem(sortPoints === 'desc'))}>Cao → Thấp</button>
+                              <button onClick={() => { setSortPoints(''); setOpenMenu(null) }} style={css(hItem(!sortPoints))}>Bỏ sắp xếp</button>
+                            </div>
+                        )}
+                      </div>
+
+                      <span style={css('font-size:12px;color:#8b8578;text-transform:uppercase;')}>Thao tác</span>
                     </div>
-                    {customers.length === 0 ? (
-                        <div style={css('padding:30px;text-align:center;color:#8b8578;font-size:13.5px;')}>Chưa có khách trong bộ nhớ.</div>
-                    ) : customers.map((c) => (
+                    {custView.length === 0 ? (
+                        <div style={css('padding:30px;text-align:center;color:#8b8578;font-size:13.5px;')}>{customers.length === 0 ? 'Chưa có khách trong bộ nhớ.' : 'Không tìm thấy khách phù hợp.'}</div>
+                    ) : custView.map((c) => (
                         <div key={c.id} style={css('display:grid;grid-template-columns:1.4fr 1fr 0.9fr 0.9fr 130px;padding:15px 22px;border-top:1px solid rgba(255,255,255,0.07);align-items:center;')}>
                           <div style={css('display:flex;align-items:center;gap:11px;')}>
                             <div style={css('width:34px;height:34px;border-radius:50%;background:rgba(200,162,83,0.12);border:1px solid rgba(200,162,83,0.25);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);color:var(--gold);font-size:13px;flex-shrink:0;')}>{(c.name.trim()[0] || '?').toUpperCase()}</div>
@@ -371,7 +477,7 @@ export default function ReceptionDashboard() {
                           <span style={css('font-size:13.5px;color:#a39e92;')}>{c.phone}</span>
                           <span style={css('font-size:13px;color:var(--gold);')}>{c.tier}</span>
                           <span style={css('font-size:13.5px;color:#c4bfb2;')}>{(c.points || 0).toLocaleString('vi-VN')}</span>
-                          <button onClick={() => openResetPw(c.id)} className="hov-border-gold" style={css('justify-self:end;background:transparent;border:1px solid rgba(255,255,255,0.16);color:#c4bfb2;padding:7px 13px;border-radius:8px;font-size:12.5px;cursor:pointer;')}>Đổi mật khẩu</button>
+                          <button onClick={() => openResetPw(c.id)} className="hov-border-gold" style={css('justify-self:start;background:transparent;border:1px solid rgba(255,255,255,0.16);color:#c4bfb2;padding:7px 13px;border-radius:8px;font-size:12.5px;cursor:pointer;')}>Đổi mật khẩu</button>
                         </div>
                     ))}
                   </div>
