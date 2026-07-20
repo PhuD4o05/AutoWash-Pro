@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { css } from '../lib/css'
 import { fmtVND } from '../lib/format'
 import Toast from '../components/Toast'
-Dashboar
 import { receptionApi, publicApi } from '../api/endpoints'
 
 const STATUS_VI = { Confirmed: 'Đã xác nhận', 'Checked-in': 'Đã nhận xe', Waiting: 'Đang chờ', Washing: 'Đang rửa', Drying: 'Đang sấy', Completed: 'Hoàn thành', Cancelled: 'Đã huỷ', Pending: 'Chờ xác nhận' }
